@@ -1,0 +1,16 @@
+{
+  "oauth": {
+    "client_id": "",
+    "client_secret": "",
+    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    "scope": "https://ads.microsoft.com/msads.manage offline_access"
+  },
+  "clients": {
+    "neon-one": {
+      "customer_id": "251324264",
+      "account_id": "141522471",
+      "name": "Neon One",
+      "folder": "/Users/mark/claude-code/neon-one"
+    }
+  }
+}

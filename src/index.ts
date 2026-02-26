@@ -380,7 +380,7 @@ class BingAdsManager {
     const [endYear, endMonth, endDay] = options.endDate.split("-").map(Number);
 
     const reportRequest = {
-      "@odata.type": "#Microsoft.Advertiser.Reporting.CampaignPerformanceReportRequest",
+      Type: "CampaignPerformanceReportRequest",
       ReportName: "Campaign Performance",
       Format: "Csv",
       FormatVersion: "2.0",
@@ -437,7 +437,7 @@ class BingAdsManager {
     }
 
     const reportRequest = {
-      "@odata.type": "#Microsoft.Advertiser.Reporting.KeywordPerformanceReportRequest",
+      Type: "KeywordPerformanceReportRequest",
       ReportName: "Keyword Performance",
       Format: "Csv",
       FormatVersion: "2.0",
@@ -499,7 +499,7 @@ class BingAdsManager {
     }
 
     const reportRequest = {
-      "@odata.type": "#Microsoft.Advertiser.Reporting.SearchQueryPerformanceReportRequest",
+      Type: "SearchQueryPerformanceReportRequest",
       ReportName: "Search Term Report",
       Format: "Csv",
       FormatVersion: "2.0",

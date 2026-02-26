@@ -112,8 +112,8 @@ class BingAdsManager {
     async listCampaigns(client) {
         const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/QueryByAccountId`;
         const body = {
-            AccountId: parseInt(client.account_id, 10),
-            CampaignType: "Search",
+            AccountId: client.account_id,
+            CampaignType: ["Search", "Shopping", "Audience", "PerformanceMax"],
         };
         return await this.apiCall(url, body, client);
     }
@@ -299,7 +299,7 @@ class BingAdsManager {
         const [startYear, startMonth, startDay] = options.startDate.split("-").map(Number);
         const [endYear, endMonth, endDay] = options.endDate.split("-").map(Number);
         const reportRequest = {
-            "@odata.type": "#Microsoft.Advertiser.Reporting.CampaignPerformanceReportRequest",
+            Type: "CampaignPerformanceReportRequest",
             ReportName: "Campaign Performance",
             Format: "Csv",
             FormatVersion: "2.0",
@@ -348,7 +348,7 @@ class BingAdsManager {
             }));
         }
         const reportRequest = {
-            "@odata.type": "#Microsoft.Advertiser.Reporting.KeywordPerformanceReportRequest",
+            Type: "KeywordPerformanceReportRequest",
             ReportName: "Keyword Performance",
             Format: "Csv",
             FormatVersion: "2.0",
@@ -402,7 +402,7 @@ class BingAdsManager {
             }));
         }
         const reportRequest = {
-            "@odata.type": "#Microsoft.Advertiser.Reporting.SearchQueryPerformanceReportRequest",
+            Type: "SearchQueryPerformanceReportRequest",
             ReportName: "Search Term Report",
             Format: "Csv",
             FormatVersion: "2.0",

@@ -13,6 +13,15 @@ import { pipeline } from "stream/promises";
 import { createGunzip } from "zlib";
 import { tmpdir } from "os";
 
+// Log build fingerprint at startup
+try {
+  const __buildInfoDir = dirname(new URL(import.meta.url).pathname);
+  const buildInfo = JSON.parse(readFileSync(join(__buildInfoDir, "build-info.json"), "utf-8"));
+  console.error(`[build] SHA: ${buildInfo.sha} (${buildInfo.builtAt})`);
+} catch {
+  // build-info.json not present (dev mode)
+}
+
 // ============================================
 // CONFIGURATION
 // ============================================
@@ -166,7 +175,7 @@ class BingAdsManager {
     const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/QueryByAccountId`;
     const body = {
       AccountId: client.account_id,
-      CampaignType: ["Search", "Shopping", "Audience", "PerformanceMax"],
+      CampaignType: "Search Shopping Audience PerformanceMax",
     };
     return await this.apiCall(url, body, client);
   }

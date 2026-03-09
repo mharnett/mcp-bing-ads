@@ -63,6 +63,81 @@ function getClientFromWorkingDir(config: Config, cwd: string): ClientConfig | nu
 }
 
 // ============================================
+// TYPED ERRORS (mirrors motion-mcp pattern)
+// ============================================
+
+class BingAdsAuthError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = "BingAdsAuthError";
+  }
+}
+
+class BingAdsRateLimitError extends Error {
+  constructor(
+    public readonly retryAfterMs: number,
+    cause?: unknown,
+  ) {
+    super(`Rate limited, retry after ${retryAfterMs}ms`);
+    this.name = "BingAdsRateLimitError";
+    this.cause = cause;
+  }
+}
+
+class BingAdsServiceError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = "BingAdsServiceError";
+  }
+}
+
+// ============================================
+// STARTUP CREDENTIAL VALIDATION
+// ============================================
+
+function validateCredentials(): { valid: boolean; missing: string[] } {
+  const required = [
+    "BING_ADS_DEVELOPER_TOKEN",
+    "BING_ADS_CLIENT_ID",
+    "BING_ADS_REFRESH_TOKEN",
+  ];
+  const missing = required.filter(
+    (key) => !process.env[key] || process.env[key]!.trim() === "",
+  );
+  return { valid: missing.length === 0, missing };
+}
+
+function classifyError(error: any): Error {
+  const message = error?.message || String(error);
+  const status = error?.status;
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    message.includes("invalid_grant") ||
+    message.includes("OAuth token refresh failed") ||
+    message.includes("AuthenticationTokenExpired") ||
+    message.includes("InvalidCredentials")
+  ) {
+    return new BingAdsAuthError(
+      `Auth failed: ${message}. Refresh token may be expired. Re-authenticate and update Keychain.`,
+      error,
+    );
+  }
+
+  if (status === 429 || message.includes("RateLimit") || message.includes("CallRateExceeded")) {
+    const retryMs = 60_000;
+    return new BingAdsRateLimitError(retryMs, error);
+  }
+
+  if (status >= 500 || message.includes("InternalError")) {
+    return new BingAdsServiceError(`Bing Ads API server error: ${message}`, error);
+  }
+
+  return error;
+}
+
+// ============================================
 // MICROSOFT ADVERTISING API CLIENT
 // ============================================
 
@@ -78,8 +153,18 @@ class BingAdsManager {
 
   constructor(config: Config) {
     this.config = config;
-    this.developerToken = process.env.BING_ADS_DEVELOPER_TOKEN || "";
-    this.refreshToken = process.env.BING_ADS_REFRESH_TOKEN || "";
+
+    // Validate credentials at startup — fail fast
+    const creds = validateCredentials();
+    if (!creds.valid) {
+      const msg = `[STARTUP ERROR] Missing required credentials: ${creds.missing.join(", ")}. MCP will not function. Check run-mcp.sh and Keychain entries.`;
+      console.error(msg);
+      throw new BingAdsAuthError(msg);
+    }
+    console.error("[startup] Credentials validated: all required env vars present");
+
+    this.developerToken = process.env.BING_ADS_DEVELOPER_TOKEN!;
+    this.refreshToken = process.env.BING_ADS_REFRESH_TOKEN!;
 
     // Allow env vars to override config for OAuth
     if (process.env.BING_ADS_CLIENT_ID) {
@@ -114,16 +199,27 @@ class BingAdsManager {
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`OAuth token refresh failed: ${resp.status} ${text}`);
+      const error = new Error(`OAuth token refresh failed: ${resp.status} ${text}`);
+      throw classifyError(error);
     }
 
     const data = await resp.json() as any;
     this.accessToken = data.access_token;
     this.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
 
-    // Store new refresh token if rotated
-    if (data.refresh_token) {
+    // Persist rotated refresh token to Keychain so restarts use the latest
+    if (data.refresh_token && data.refresh_token !== this.refreshToken) {
       this.refreshToken = data.refresh_token;
+      try {
+        const { execSync } = await import("child_process");
+        execSync(
+          `security delete-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN 2>/dev/null; ` +
+          `security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w "${data.refresh_token}"`,
+        );
+        console.error("[token] Rotated refresh token persisted to Keychain");
+      } catch (err) {
+        console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain:", err);
+      }
     }
 
     return this.accessToken!;
@@ -152,7 +248,9 @@ class BingAdsManager {
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Bing Ads API error: ${resp.status} ${text}`);
+      const error = new Error(`Bing Ads API error: ${resp.status} ${text}`);
+      (error as any).status = resp.status;
+      throw classifyError(error);
     }
 
     return await resp.json();
@@ -783,15 +881,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
-  } catch (error: any) {
+  } catch (rawError: any) {
+    const error = classifyError(rawError);
+    console.error(`[error] ${error.name}: ${error.message}`);
+
+    const response: Record<string, unknown> = {
+      error: true,
+      error_type: error.name,
+      message: error.message,
+    };
+
+    if (error instanceof BingAdsAuthError) {
+      response.action_required = "Re-authenticate: refresh token may be expired. Update Keychain entry BING_ADS_REFRESH_TOKEN.";
+    } else if (error instanceof BingAdsRateLimitError) {
+      response.retry_after_ms = error.retryAfterMs;
+      response.action_required = `Rate limited. Retry after ${Math.ceil(error.retryAfterMs / 1000)} seconds.`;
+    } else if (error instanceof BingAdsServiceError) {
+      response.action_required = "Bing Ads API server error. This is transient — retry in a few minutes.";
+    } else {
+      response.details = rawError.stack;
+    }
+
     return {
       content: [{
         type: "text",
-        text: JSON.stringify({
-          error: true,
-          message: error.message,
-          details: error.stack,
-        }, null, 2),
+        text: JSON.stringify(response, null, 2),
       }],
       isError: true,
     };
@@ -800,9 +914,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 async function main() {
+  // Startup health check: verify OAuth token refresh works
+  try {
+    const mgr = new BingAdsManager(config);
+    await (mgr as any).getAccessToken();
+    console.error("[startup] Auth verified: OAuth token refresh succeeded");
+  } catch (err: any) {
+    console.error(`[STARTUP WARNING] Auth check FAILED: ${err.message}`);
+    console.error(`[STARTUP WARNING] MCP will start but ALL API calls will fail until auth is fixed.`);
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("MCP Bing Ads server running");
+  console.error("[startup] MCP Bing Ads server running");
 }
 
 main().catch(console.error);

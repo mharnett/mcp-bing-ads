@@ -144,7 +144,7 @@ class BingAdsManager {
         const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/QueryByAccountId`;
         const body = {
             AccountId: client.account_id,
-            CampaignType: "Search Shopping Audience PerformanceMax",
+            CampaignType: "Search",
         };
         return await this.apiCall(url, body, client);
     }
@@ -511,7 +511,7 @@ class BingAdsManager {
         return await this.apiCall(url, body, client);
     }
     async updateCampaignBudget(client, campaignId, dailyBudget) {
-        const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/UpdateCampaigns`;
+        const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/Update`;
         const body = {
             AccountId: client.account_id,
             Campaigns: [{

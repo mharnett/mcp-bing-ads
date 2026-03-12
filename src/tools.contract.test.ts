@@ -8,6 +8,10 @@ const EXPECTED_TOOL_NAMES = [
   "bing_ads_list_ad_groups",
   "bing_ads_keyword_performance",
   "bing_ads_search_term_report",
+  "bing_ads_pause_keywords",
+  "bing_ads_list_shared_entities",
+  "bing_ads_add_shared_negatives",
+  "bing_ads_update_campaign_budget",
 ];
 
 describe("Bing Ads MCP tools contract", () => {

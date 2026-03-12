@@ -579,6 +579,61 @@ class BingAdsManager {
     return await this.waitForReport(client, requestId);
   }
 
+  // ============================================
+  // WRITE OPERATIONS
+  // ============================================
+
+  async pauseKeywords(client: ClientConfig, adGroupId: string, keywordIds: string[]): Promise<any> {
+    const url = `${CAMPAIGN_MGMT_BASE}/Keywords/UpdateKeywords`;
+    const keywords = keywordIds.map(id => ({
+      Id: parseInt(id),
+      Status: "Paused",
+    }));
+    const body = {
+      AdGroupId: adGroupId,
+      Keywords: keywords,
+    };
+    return await this.apiCall(url, body, client);
+  }
+
+  async listSharedEntities(client: ClientConfig, entityType: string = "NegativeKeywordList"): Promise<any> {
+    const url = `${CAMPAIGN_MGMT_BASE}/SharedEntities/Query`;
+    const body = {
+      SharedEntityType: entityType,
+    };
+    return await this.apiCall(url, body, client);
+  }
+
+  async addSharedNegatives(client: ClientConfig, sharedListId: string, keywords: Array<{ text: string; match_type?: string }>): Promise<any> {
+    const url = `${CAMPAIGN_MGMT_BASE}/SharedListItems/Add`;
+    const listItems = keywords.map(kw => ({
+      Type: "NegativeKeyword",
+      Text: kw.text,
+      MatchType: kw.match_type || "Phrase",
+    }));
+    const body = {
+      SharedList: {
+        Id: parseInt(sharedListId),
+        Type: "NegativeKeywordList",
+      },
+      ListItems: listItems,
+    };
+    return await this.apiCall(url, body, client);
+  }
+
+  async updateCampaignBudget(client: ClientConfig, campaignId: string, dailyBudget: number): Promise<any> {
+    const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/UpdateCampaigns`;
+    const body = {
+      AccountId: client.account_id,
+      Campaigns: [{
+        Id: parseInt(campaignId),
+        DailyBudget: dailyBudget,
+        BudgetType: "DailyBudgetStandard",
+      }],
+    };
+    return await this.apiCall(url, body, client);
+  }
+
   getConfig(): Config {
     return this.config;
   }
@@ -719,6 +774,65 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           endDate: args?.end_date as string,
           campaignIds: args?.campaign_ids as string[],
         });
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_pause_keywords": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.pauseKeywords(
+          client,
+          args?.ad_group_id as string,
+          args?.keyword_ids as string[],
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_list_shared_entities": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.listSharedEntities(
+          client,
+          (args?.entity_type as string) || "NegativeKeywordList",
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_add_shared_negatives": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.addSharedNegatives(
+          client,
+          args?.shared_list_id as string,
+          args?.keywords as Array<{ text: string; match_type?: string }>,
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_update_campaign_budget": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.updateCampaignBudget(
+          client,
+          args?.campaign_id as string,
+          args?.daily_budget as number,
+        );
         return {
           content: [{
             type: "text",

@@ -5,6 +5,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, } from "@modelcontextpro
 import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { BingAdsAuthError, BingAdsRateLimitError, BingAdsServiceError, classifyError, validateCredentials, } from "./errors.js";
+import { tools } from "./tools.js";
 // Log build fingerprint at startup
 try {
     const __buildInfoDir = dirname(new URL(import.meta.url).pathname);
@@ -471,6 +472,56 @@ class BingAdsManager {
         const requestId = await this.submitReport(client, reportRequest);
         return await this.waitForReport(client, requestId);
     }
+    // ============================================
+    // WRITE OPERATIONS
+    // ============================================
+    async pauseKeywords(client, adGroupId, keywordIds) {
+        const url = `${CAMPAIGN_MGMT_BASE}/Keywords/UpdateKeywords`;
+        const keywords = keywordIds.map(id => ({
+            Id: parseInt(id),
+            Status: "Paused",
+        }));
+        const body = {
+            AdGroupId: adGroupId,
+            Keywords: keywords,
+        };
+        return await this.apiCall(url, body, client);
+    }
+    async listSharedEntities(client, entityType = "NegativeKeywordList") {
+        const url = `${CAMPAIGN_MGMT_BASE}/SharedEntities/Query`;
+        const body = {
+            SharedEntityType: entityType,
+        };
+        return await this.apiCall(url, body, client);
+    }
+    async addSharedNegatives(client, sharedListId, keywords) {
+        const url = `${CAMPAIGN_MGMT_BASE}/SharedListItems/Add`;
+        const listItems = keywords.map(kw => ({
+            Type: "NegativeKeyword",
+            Text: kw.text,
+            MatchType: kw.match_type || "Phrase",
+        }));
+        const body = {
+            SharedList: {
+                Id: parseInt(sharedListId),
+                Type: "NegativeKeywordList",
+            },
+            ListItems: listItems,
+        };
+        return await this.apiCall(url, body, client);
+    }
+    async updateCampaignBudget(client, campaignId, dailyBudget) {
+        const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/UpdateCampaigns`;
+        const body = {
+            AccountId: client.account_id,
+            Campaigns: [{
+                    Id: parseInt(campaignId),
+                    DailyBudget: dailyBudget,
+                    BudgetType: "DailyBudgetStandard",
+                }],
+        };
+        return await this.apiCall(url, body, client);
+    }
     getConfig() {
         return this.config;
     }
@@ -488,88 +539,6 @@ const server = new Server({
         tools: {},
     },
 });
-const tools = [
-    {
-        name: "bing_ads_get_client_context",
-        description: "Get the current client context based on working directory. Call this first to confirm which Bing Ads account you're working with.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                working_directory: {
-                    type: "string",
-                    description: "The current working directory",
-                },
-            },
-            required: ["working_directory"],
-        },
-    },
-    {
-        name: "bing_ads_list_campaigns",
-        description: "List all campaigns for the current client's Bing/Microsoft Advertising account, including campaign name, status, budget, and type.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                account_id: {
-                    type: "string",
-                    description: "The account ID (uses context if not provided)",
-                },
-            },
-        },
-    },
-    {
-        name: "bing_ads_get_campaign_performance",
-        description: "Get campaign performance metrics (impressions, clicks, CTR, CPC, spend, conversions, revenue) for a date range.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                account_id: { type: "string" },
-                start_date: { type: "string", description: "Start date YYYY-MM-DD" },
-                end_date: { type: "string", description: "End date YYYY-MM-DD" },
-            },
-            required: ["start_date", "end_date"],
-        },
-    },
-    {
-        name: "bing_ads_list_ad_groups",
-        description: "List ad groups within a specific campaign, including ad group name and status.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                account_id: { type: "string" },
-                campaign_id: { type: "string", description: "The campaign ID to list ad groups for" },
-            },
-            required: ["campaign_id"],
-        },
-    },
-    {
-        name: "bing_ads_keyword_performance",
-        description: "Get keyword performance report with metrics including impressions, clicks, cost, conversions, quality score. Optionally filter by campaign.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                account_id: { type: "string" },
-                start_date: { type: "string", description: "Start date YYYY-MM-DD" },
-                end_date: { type: "string", description: "End date YYYY-MM-DD" },
-                campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by campaign IDs" },
-            },
-            required: ["start_date", "end_date"],
-        },
-    },
-    {
-        name: "bing_ads_search_term_report",
-        description: "Get search term report showing actual search queries that triggered ads, with matched keywords and performance metrics.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                account_id: { type: "string" },
-                start_date: { type: "string", description: "Start date YYYY-MM-DD" },
-                end_date: { type: "string", description: "End date YYYY-MM-DD" },
-                campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by campaign IDs" },
-            },
-            required: ["start_date", "end_date"],
-        },
-    },
-];
 // Handle list tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
     return { tools };
@@ -680,6 +649,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     endDate: args?.end_date,
                     campaignIds: args?.campaign_ids,
                 });
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(result, null, 2),
+                        }],
+                };
+            }
+            case "bing_ads_pause_keywords": {
+                const client = resolveClient(args?.account_id);
+                const result = await adsManager.pauseKeywords(client, args?.ad_group_id, args?.keyword_ids);
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(result, null, 2),
+                        }],
+                };
+            }
+            case "bing_ads_list_shared_entities": {
+                const client = resolveClient(args?.account_id);
+                const result = await adsManager.listSharedEntities(client, args?.entity_type || "NegativeKeywordList");
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(result, null, 2),
+                        }],
+                };
+            }
+            case "bing_ads_add_shared_negatives": {
+                const client = resolveClient(args?.account_id);
+                const result = await adsManager.addSharedNegatives(client, args?.shared_list_id, args?.keywords);
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(result, null, 2),
+                        }],
+                };
+            }
+            case "bing_ads_update_campaign_budget": {
+                const client = resolveClient(args?.account_id);
+                const result = await adsManager.updateCampaignBudget(client, args?.campaign_id, args?.daily_budget);
                 return {
                     content: [{
                             type: "text",

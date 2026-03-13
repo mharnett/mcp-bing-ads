@@ -37,12 +37,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/drak-marketing/mcp-bing-ads"
+    "url": "https://github.com/mharnett/mcp-bing-ads"
   },
   "bugs": {
-    "url": "https://github.com/drak-marketing/mcp-bing-ads/issues"
+    "url": "https://github.com/mharnett/mcp-bing-ads/issues"
   },
-  "homepage": "https://github.com/drak-marketing/mcp-bing-ads#readme",
+  "homepage": "https://github.com/mharnett/mcp-bing-ads#readme",
   "engines": {
     "node": ">=18.0.0"
   },

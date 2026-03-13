@@ -1,5 +1,10 @@
 # Bing Ads MCP Server
 
+[![npm version](https://img.shields.io/npm/v/mcp-bing-ads)](https://www.npmjs.com/package/mcp-bing-ads)
+[![npm downloads](https://img.shields.io/npm/dm/mcp-bing-ads)](https://www.npmjs.com/package/mcp-bing-ads)
+[![GitHub stars](https://img.shields.io/github/stars/mharnett/mcp-bing-ads)](https://github.com/mharnett/mcp-bing-ads)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Claude to manage Bing/Microsoft Ads accounts with full campaign, ad group, keyword, and performance analysis capabilities.
 
 **Features:**
@@ -224,10 +229,12 @@ Contributions welcome! Please:
 
 ---
 
-**Maintained by:** VS Code AI team & community contributors
+## Built By
+
+**[Mark Harnett](https://www.linkedin.com/in/markharnett/)** — Demand generation leader and paid media practitioner building AI-powered ad management tools. This is the first comprehensive open-source Bing Ads MCP server — born from managing real campaigns across multiple accounts and wanting Claude to do the heavy lifting.
+
+Built with production workloads in mind: resilient API calls (circuit breakers, retry with backoff, response truncation), full Quality Score diagnostics, and negative keyword management at scale.
+
+**Also by Mark:** [mcp-linkedin-ads](https://github.com/mharnett/mcp-linkedin-ads) — LinkedIn Ads MCP server with 65+ tools.
 
 **Last Updated:** 2026-03-13
-
-**Stability:** Production-ready
-
-**Note:** This is the first comprehensive open-source Bing Ads MCP. No other serious alternatives exist.

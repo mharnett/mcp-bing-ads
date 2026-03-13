@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.mharnett/bing-ads",
+  "description": "MCP server for Microsoft Advertising (Bing Ads) API — campaigns, ad groups, keywords, performance reports, search term reports, shared negative keyword lists, and budget management. Built-in resilience with retry, circuit breaker, and response size limiting.",
+  "repository": {
+    "url": "https://github.com/mharnett/mcp-bing-ads",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mcp-bing-ads",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "BING_ADS_DEVELOPER_TOKEN",
+          "description": "Microsoft Advertising developer token",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "BING_ADS_CLIENT_ID",
+          "description": "Azure AD app client ID for OAuth",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "BING_ADS_REFRESH_TOKEN",
+          "description": "OAuth refresh token for Microsoft Advertising API",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "BING_ADS_CLIENT_SECRET",
+          "description": "Azure AD app client secret (optional for public clients)",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

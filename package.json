@@ -3,7 +3,20 @@
   "version": "1.0.0",
   "description": "MCP server for Microsoft Advertising (Bing Ads) API with campaign, ad group, keyword, and performance reporting. First comprehensive open-source Bing Ads MCP.",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "config.example.json"
+  ],
   "scripts": {
     "build": "tsc && node -e \"fs=require('fs');cp=require('child_process');sha=cp.execSync('git rev-parse --short HEAD 2>/dev/null||echo unknown').toString().trim();fs.writeFileSync('dist/build-info.json',JSON.stringify({sha,builtAt:new Date().toISOString()}))\"",
     "start": "node dist/index.js",
@@ -20,16 +33,16 @@
     "claude",
     "ad-management"
   ],
-  "author": "VS Code AI Team",
+  "author": "drak-marketing",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anthropics/mcp-bing-ads"
+    "url": "https://github.com/drak-marketing/mcp-bing-ads"
   },
   "bugs": {
-    "url": "https://github.com/anthropics/mcp-bing-ads/issues"
+    "url": "https://github.com/drak-marketing/mcp-bing-ads/issues"
   },
-  "homepage": "https://github.com/anthropics/mcp-bing-ads#readme",
+  "homepage": "https://github.com/drak-marketing/mcp-bing-ads#readme",
   "engines": {
     "node": ">=18.0.0"
   },

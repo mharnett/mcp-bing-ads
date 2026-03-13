@@ -1,0 +1,16 @@
+{
+  "oauth": {
+    "client_id": "YOUR_MICROSOFT_CLIENT_ID",
+    "client_secret": "YOUR_MICROSOFT_CLIENT_SECRET",
+    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    "scope": "https://ads.microsoft.com/msads.manage offline_access"
+  },
+  "clients": {
+    "default": {
+      "customer_id": "YOUR_BING_CUSTOMER_ID",
+      "account_id": "YOUR_BING_ACCOUNT_ID",
+      "name": "Primary Account",
+      "folder": "/path/to/working/directory"
+    }
+  }
+}

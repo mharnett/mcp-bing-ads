@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mharnett/bing-ads",
-  "description": "MCP server for Microsoft Advertising (Bing Ads) API — campaigns, ad groups, keywords, performance reports, search term reports, shared negative keyword lists, and budget management. Built-in resilience with retry, circuit breaker, and response size limiting.",
+  "description": "MCP server for Microsoft Advertising (Bing Ads) — campaigns, keywords, and reports",
   "repository": {
     "url": "https://github.com/mharnett/mcp-bing-ads",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.0.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "mcp-bing-ads",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "transport": {
         "type": "stdio"
       },

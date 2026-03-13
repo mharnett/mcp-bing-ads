@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { BingAdsAuthError, BingAdsRateLimitError, BingAdsServiceError, classifyError, validateCredentials, } from "./errors.js";
 import { tools } from "./tools.js";
+import { withResilience, safeResponse, logger } from "./resilience.js";
 // Log build fingerprint at startup
 try {
     const __buildInfoDir = dirname(new URL(import.meta.url).pathname);
@@ -112,22 +113,25 @@ class BingAdsManager {
             "Content-Type": "application/json",
         };
     }
-    async apiCall(url, body, client) {
-        const token = await this.getAccessToken();
-        const headers = this.getHeaders(client);
-        headers["Authorization"] = `Bearer ${token}`;
-        const resp = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-            const text = await resp.text();
-            const error = new Error(`Bing Ads API error: ${resp.status} ${text}`);
-            error.status = resp.status;
-            throw classifyError(error);
-        }
-        return await resp.json();
+    async apiCall(url, body, client, operationName = "apiCall") {
+        return withResilience(async () => {
+            const token = await this.getAccessToken();
+            const headers = this.getHeaders(client);
+            headers["Authorization"] = `Bearer ${token}`;
+            const resp = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
+                signal: AbortSignal.timeout(30_000),
+            });
+            if (!resp.ok) {
+                const text = await resp.text();
+                const error = new Error(`Bing Ads API error: ${resp.status} ${text}`);
+                error.status = resp.status;
+                throw classifyError(error);
+            }
+            return await resp.json();
+        }, operationName);
     }
     getClientForAccountId(accountId) {
         for (const client of Object.values(this.config.clients)) {
@@ -146,33 +150,35 @@ class BingAdsManager {
             AccountId: client.account_id,
             CampaignType: "Search",
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "listCampaigns");
     }
     async listAdGroups(client, campaignId) {
         const url = `${CAMPAIGN_MGMT_BASE}/AdGroups/QueryByCampaignId`;
         const body = {
             CampaignId: campaignId,
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "listAdGroups");
     }
     // ============================================
     // REPORTING
     // ============================================
     async submitReport(client, reportRequest) {
         const url = `${REPORTING_BASE}/GenerateReport/Submit`;
-        const result = await this.apiCall(url, { ReportRequest: reportRequest }, client);
+        const result = await this.apiCall(url, { ReportRequest: reportRequest }, client, "submitReport");
         return result.ReportRequestId;
     }
     async pollReport(client, requestId) {
         const url = `${REPORTING_BASE}/GenerateReport/Poll`;
-        const result = await this.apiCall(url, { ReportRequestId: requestId }, client);
+        const result = await this.apiCall(url, { ReportRequestId: requestId }, client, "pollReport");
         return {
             status: result.ReportRequestStatus.Status,
             url: result.ReportRequestStatus.ReportDownloadUrl || undefined,
         };
     }
     async downloadAndParseCsv(downloadUrl) {
-        const resp = await fetch(downloadUrl);
+        const resp = await fetch(downloadUrl, {
+            signal: AbortSignal.timeout(60_000),
+        });
         if (!resp.ok) {
             throw new Error(`Failed to download report: ${resp.status}`);
         }
@@ -485,14 +491,14 @@ class BingAdsManager {
             AdGroupId: adGroupId,
             Keywords: keywords,
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "pauseKeywords");
     }
     async listSharedEntities(client, entityType = "NegativeKeywordList") {
         const url = `${CAMPAIGN_MGMT_BASE}/SharedEntities/Query`;
         const body = {
             SharedEntityType: entityType,
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "listSharedEntities");
     }
     async addSharedNegatives(client, sharedListId, keywords) {
         const url = `${CAMPAIGN_MGMT_BASE}/SharedListItems/Add`;
@@ -508,7 +514,7 @@ class BingAdsManager {
             },
             ListItems: listItems,
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "addSharedNegatives");
     }
     async updateCampaignBudget(client, campaignId, dailyBudget) {
         const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/Update`;
@@ -520,7 +526,7 @@ class BingAdsManager {
                     BudgetType: "DailyBudgetStandard",
                 }],
         };
-        return await this.apiCall(url, body, client);
+        return await this.apiCall(url, body, client, "updateCampaignBudget");
     }
     getConfig() {
         return this.config;
@@ -600,7 +606,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                             type: "text",
-                            text: JSON.stringify(result, null, 2),
+                            text: JSON.stringify(safeResponse(result, "listCampaigns"), null, 2),
                         }],
                 };
             }
@@ -613,7 +619,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                             type: "text",
-                            text: JSON.stringify(result, null, 2),
+                            text: JSON.stringify(safeResponse(result, "getCampaignPerformance"), null, 2),
                         }],
                 };
             }
@@ -624,7 +630,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                             type: "text",
-                            text: JSON.stringify(result, null, 2),
+                            text: JSON.stringify(safeResponse(result, "listAdGroups"), null, 2),
                         }],
                 };
             }
@@ -638,7 +644,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                             type: "text",
-                            text: JSON.stringify(result, null, 2),
+                            text: JSON.stringify(safeResponse(result, "keywordPerformance"), null, 2),
                         }],
                 };
             }
@@ -652,7 +658,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return {
                     content: [{
                             type: "text",
-                            text: JSON.stringify(result, null, 2),
+                            text: JSON.stringify(safeResponse(result, "searchTermReport"), null, 2),
                         }],
                 };
             }
@@ -702,7 +708,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     catch (rawError) {
         const error = classifyError(rawError);
-        console.error(`[error] ${error.name}: ${error.message}`);
+        logger.error({ error_type: error.name, message: error.message }, "Tool call failed");
         const response = {
             error: true,
             error_type: error.name,

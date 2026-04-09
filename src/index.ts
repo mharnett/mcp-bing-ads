@@ -780,6 +780,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_get_campaign_performance": {
+        // Future date validation
+        const today_cp = new Date().toISOString().slice(0, 10);
+        if (args?.start_date && (args.start_date as string) > today_cp) {
+          return { content: [{ type: "text", text: JSON.stringify(safeResponse({ error: `start_date "${args.start_date}" is in the future. Reports only cover historical data.` }, "getCampaignPerformance"), null, 2) }] };
+        }
         const client = resolveClient(args?.account_id as string);
         const result = await adsManager.getCampaignPerformance(client, {
           startDate: args?.start_date as string,
@@ -806,6 +811,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_keyword_performance": {
+        // Future date validation
+        const today_bkp = new Date().toISOString().slice(0, 10);
+        if (args?.start_date && (args.start_date as string) > today_bkp) {
+          return { content: [{ type: "text", text: JSON.stringify(safeResponse({ error: `start_date "${args.start_date}" is in the future. Reports only cover historical data.` }, "keywordPerformance"), null, 2) }] };
+        }
         const client = resolveClient(args?.account_id as string);
         const result = await adsManager.getKeywordPerformance(client, {
           startDate: args?.start_date as string,
@@ -821,6 +831,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_search_term_report": {
+        // Future date validation
+        const today_bstr = new Date().toISOString().slice(0, 10);
+        if (args?.start_date && (args.start_date as string) > today_bstr) {
+          return { content: [{ type: "text", text: JSON.stringify(safeResponse({ error: `start_date "${args.start_date}" is in the future. Reports only cover historical data.` }, "searchTermReport"), null, 2) }] };
+        }
         const client = resolveClient(args?.account_id as string);
         const result = await adsManager.getSearchTermReport(client, {
           startDate: args?.start_date as string,

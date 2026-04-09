@@ -14,19 +14,24 @@ import pino from "pino";
 // LOGGER
 // ============================================
 
-export const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
-  ...(process.env.NODE_ENV !== "test" && {
-    transport: {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        singleLine: true,
-        translateTime: "SYS:standard",
+export const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || "info",
+    ...(process.env.NODE_ENV !== "test" && {
+      transport: {
+        target: "pino-pretty",
+        options: {
+          colorize: true,
+          singleLine: true,
+          translateTime: "SYS:standard",
+          destination: 2, // stderr -- stdout is reserved for MCP JSON-RPC
+        },
       },
-    },
-  }),
-});
+    }),
+  },
+  // When no transport (test mode), write to stderr directly
+  process.env.NODE_ENV === "test" ? pino.destination(2) : undefined,
+);
 
 // ============================================
 // SAFE RESPONSE (Response Size Limiting)

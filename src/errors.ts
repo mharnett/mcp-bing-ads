@@ -14,7 +14,7 @@ export class BingAdsRateLimitError extends Error {
     public readonly retryAfterMs: number,
     cause?: unknown,
   ) {
-    super(`Rate limited, retry after ${retryAfterMs}ms`);
+    super(`Bing Ads rate limited, retry after ${retryAfterMs}ms`);
     this.name = "BingAdsRateLimitError";
     this.cause = cause;
   }
@@ -56,7 +56,7 @@ export function classifyError(error: any): Error {
     message.includes("InvalidCredentials")
   ) {
     return new BingAdsAuthError(
-      `Auth failed: ${message}. Refresh token may be expired. Re-authenticate and update Keychain.`,
+      `Bing Ads auth failed: ${message}. Refresh token may be expired. Re-authenticate and update Keychain.`,
       error,
     );
   }

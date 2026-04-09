@@ -3,7 +3,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 export const tools: Tool[] = [
   {
     name: "bing_ads_get_client_context",
-    description: "Get the current client context based on working directory. Call this first to confirm which Bing Ads account you're working with.",
+    description: "Get the current client context and health status based on working directory. Call this first to confirm which Bing Ads account you're working with.",
     inputSchema: {
       type: "object",
       properties: {

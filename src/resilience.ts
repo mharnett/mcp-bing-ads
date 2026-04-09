@@ -47,6 +47,11 @@ export function safeResponse<T>(data: T, context: string): T {
     const sizeBytes = Buffer.byteLength(jsonStr, "utf-8");
     if (sizeBytes <= MAX_RESPONSE_SIZE) return current;
 
+    // Deep clone on first truncation pass to avoid mutating the original object
+    if (pass === 0 && typeof current === "object" && current !== null) {
+      current = JSON.parse(JSON.stringify(current)) as T;
+    }
+
     logger.warn({ sizeBytes, maxSize: MAX_RESPONSE_SIZE, context, pass }, "Response exceeds size limit, truncating");
 
     if (Array.isArray(current)) {

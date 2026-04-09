@@ -919,11 +919,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       response.details = rawError.stack;
     }
 
+    // Size-limit error responses through safeResponse to prevent oversized payloads
+    const safeErrorResponse = safeResponse(response, "error");
     return {
       isError: true,
       content: [{
         type: "text",
-        text: JSON.stringify(response, null, 2),
+        text: JSON.stringify(safeErrorResponse, null, 2),
       }],
     };
   }

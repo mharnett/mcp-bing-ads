@@ -28,6 +28,8 @@ npm install mcp-bing-ads
 
 ## Configuration
 
+**Security:** Never share your `.mcp.json` file or commit it to git -- it may contain API credentials. Add `.mcp.json` to your `.gitignore`.
+
 1. **Get OAuth credentials:**
    - Go to [Microsoft Azure Portal](https://portal.azure.com/)
    - Create an Azure AD app registration

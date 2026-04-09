@@ -147,7 +147,7 @@ export const tools: Tool[] = [
       properties: {
         account_id: { type: "string", description: "The account ID (uses context if not provided)" },
         campaign_id: { type: "string", description: "The numeric string campaign ID to update" },
-        daily_budget: { type: "number", description: "New daily budget amount in account currency" },
+        daily_budget: { type: "number", description: "New daily budget in dollars (e.g. 50.00 for $50/day)" },
       },
       required: ["campaign_id", "daily_budget"],
     },

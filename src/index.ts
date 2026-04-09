@@ -134,7 +134,9 @@ class BingAdsManager {
     // Validate credentials at startup — fail fast
     const creds = validateCredentials();
     if (!creds.valid) {
-      const msg = `[STARTUP ERROR] Missing required credentials: ${creds.missing.join(", ")}. MCP will not function. Check run-mcp.sh and Keychain entries.`;
+      const msg = `[STARTUP ERROR] Missing required credentials: ${creds.missing.join(", ")}. ` +
+        `Set these environment variables before starting the server.` +
+        (process.platform === "darwin" ? ` On macOS, tokens can be stored in Keychain and loaded via run-mcp.sh.` : "");
       console.error(msg);
       throw new BingAdsAuthError(msg);
     }

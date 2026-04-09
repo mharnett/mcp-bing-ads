@@ -66,7 +66,8 @@ export function classifyError(error: any): Error {
     bodyError?.code === "AuthenticationTokenExpired"
   ) {
     return new BingAdsAuthError(
-      `Bing Ads auth failed: ${message}. Refresh token may be expired. Re-authenticate and update Keychain.`,
+      `Bing Ads auth failed: ${message}. Refresh token may be expired. Run 'node get-refresh-token.cjs' and update your BING_ADS_REFRESH_TOKEN environment variable.` +
+      (process.platform === "darwin" ? ` On macOS: security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w '<token>' -U` : ""),
       error,
     );
   }

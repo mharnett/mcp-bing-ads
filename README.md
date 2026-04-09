@@ -8,7 +8,7 @@
 Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Claude to manage Bing/Microsoft Ads accounts with full campaign, ad group, keyword, and performance analysis capabilities.
 
 **Features:**
-- 10 production-tested tools
+- **10 tools** -- production-tested
 - Campaign, ad group, and keyword management
 - Keyword performance analysis with quality scores
 - Search term reporting & bid automation
@@ -84,6 +84,8 @@ Add to `~/.claude.json`:
   }
 }
 ```
+
+**Claude Desktop:** Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
 
 ### Example API Calls
 ```typescript

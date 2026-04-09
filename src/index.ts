@@ -50,6 +50,12 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
 }
 
 // ============================================
+// ENV VAR TRIMMING
+// ============================================
+
+const envTrimmed = (key: string): string => (process.env[key] || "").trim().replace(/^["']|["']$/g, "");
+
+// ============================================
 // CONFIGURATION
 // ============================================
 
@@ -115,15 +121,15 @@ class BingAdsManager {
     }
     console.error("[startup] Credentials validated: all required env vars present");
 
-    this.developerToken = process.env.BING_ADS_DEVELOPER_TOKEN!;
-    this.refreshToken = process.env.BING_ADS_REFRESH_TOKEN!;
+    this.developerToken = envTrimmed("BING_ADS_DEVELOPER_TOKEN");
+    this.refreshToken = envTrimmed("BING_ADS_REFRESH_TOKEN");
 
     // Allow env vars to override config for OAuth
     if (process.env.BING_ADS_CLIENT_ID) {
-      this.config.oauth.client_id = process.env.BING_ADS_CLIENT_ID;
+      this.config.oauth.client_id = envTrimmed("BING_ADS_CLIENT_ID");
     }
     if (process.env.BING_ADS_CLIENT_SECRET) {
-      this.config.oauth.client_secret = process.env.BING_ADS_CLIENT_SECRET;
+      this.config.oauth.client_secret = envTrimmed("BING_ADS_CLIENT_SECRET");
     }
   }
 
@@ -931,6 +937,10 @@ process.on("SIGINT", () => {
 
 process.on("SIGPIPE", () => {
   // Client disconnected -- expected during shutdown
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[error] Unhandled promise rejection:", reason);
 });
 
 main().catch(console.error);

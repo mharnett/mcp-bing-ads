@@ -161,11 +161,9 @@ class BingAdsManager {
     if (data.refresh_token && data.refresh_token !== this.refreshToken) {
       this.refreshToken = data.refresh_token;
       try {
-        const { execSync } = await import("child_process");
-        execSync(
-          `security delete-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN 2>/dev/null; ` +
-          `security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w "${data.refresh_token}"`,
-        );
+        const { execFileSync } = await import("child_process");
+        try { execFileSync("security", ["delete-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN"], { stdio: "ignore" }); } catch { /* may not exist yet */ }
+        execFileSync("security", ["add-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN", "-w", data.refresh_token]);
         console.error("[token] Rotated refresh token persisted to Keychain");
       } catch (err) {
         console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain:", err);

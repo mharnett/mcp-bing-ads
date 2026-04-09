@@ -5,6 +5,7 @@ export const tools: Tool[] = [
     name: "bing_ads_get_client_context",
     description: "Get the current client context and health status based on working directory. Call this first to confirm which Bing Ads account you're working with.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         working_directory: {
@@ -19,6 +20,7 @@ export const tools: Tool[] = [
     name: "bing_ads_list_campaigns",
     description: "List all campaigns for the current client's Bing/Microsoft Advertising account, including campaign name, status, budget, and type.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: {
@@ -32,6 +34,7 @@ export const tools: Tool[] = [
     name: "bing_ads_get_campaign_performance",
     description: "Get campaign performance metrics (impressions, clicks, CTR, CPC, spend, conversions, revenue) for a date range.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string" },
@@ -45,10 +48,11 @@ export const tools: Tool[] = [
     name: "bing_ads_list_ad_groups",
     description: "List ad groups within a specific campaign, including ad group name and status.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string" },
-        campaign_id: { type: "string", description: "The campaign ID to list ad groups for" },
+        campaign_id: { type: "string", description: "The numeric string campaign ID to list ad groups for" },
       },
       required: ["campaign_id"],
     },
@@ -57,12 +61,13 @@ export const tools: Tool[] = [
     name: "bing_ads_keyword_performance",
     description: "Get keyword performance report with metrics including impressions, clicks, cost, conversions, quality score. Optionally filter by campaign.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string" },
         start_date: { type: "string", description: "Start date YYYY-MM-DD" },
         end_date: { type: "string", description: "End date YYYY-MM-DD" },
-        campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by campaign IDs" },
+        campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by numeric string campaign IDs" },
       },
       required: ["start_date", "end_date"],
     },
@@ -71,12 +76,13 @@ export const tools: Tool[] = [
     name: "bing_ads_search_term_report",
     description: "Get search term report showing actual search queries that triggered ads, with matched keywords and performance metrics.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string" },
         start_date: { type: "string", description: "Start date YYYY-MM-DD" },
         end_date: { type: "string", description: "End date YYYY-MM-DD" },
-        campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by campaign IDs" },
+        campaign_ids: { type: "array", items: { type: "string" }, description: "Filter by numeric string campaign IDs" },
       },
       required: ["start_date", "end_date"],
     },
@@ -85,6 +91,7 @@ export const tools: Tool[] = [
     name: "bing_ads_pause_keywords",
     description: "Pause one or more keywords by setting their status to Paused. Requires ad group ID and keyword IDs.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string", description: "The account ID (uses context if not provided)" },
@@ -98,6 +105,7 @@ export const tools: Tool[] = [
     name: "bing_ads_list_shared_entities",
     description: "List shared negative keyword lists (SharedEntity type) for the account. Returns list IDs and names needed for adding negatives.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string", description: "The account ID (uses context if not provided)" },
@@ -109,6 +117,7 @@ export const tools: Tool[] = [
     name: "bing_ads_add_shared_negatives",
     description: "Add negative keywords to a shared negative keyword list. Use phrase match by default (wrap in quotes). Call bing_ads_list_shared_entities first to get list IDs.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string", description: "The account ID (uses context if not provided)" },
@@ -133,10 +142,11 @@ export const tools: Tool[] = [
     name: "bing_ads_update_campaign_budget",
     description: "Update a campaign's daily budget amount. Use bing_ads_list_campaigns first to get the campaign ID and current budget.",
     inputSchema: {
+      additionalProperties: false,
       type: "object",
       properties: {
         account_id: { type: "string", description: "The account ID (uses context if not provided)" },
-        campaign_id: { type: "string", description: "The campaign ID to update" },
+        campaign_id: { type: "string", description: "The numeric string campaign ID to update" },
         daily_budget: { type: "number", description: "New daily budget amount in account currency" },
       },
       required: ["campaign_id", "daily_budget"],

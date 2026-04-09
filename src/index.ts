@@ -20,6 +20,7 @@ import {
 } from "./errors.js";
 import { tools } from "./tools.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
+import v8 from "v8";
 
 // CLI package info
 const __cliPkg = JSON.parse(readFileSync(join(dirname(new URL(import.meta.url).pathname), "..", "package.json"), "utf-8"));
@@ -53,6 +54,17 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
   console.error(__cliPkg.version);
   process.exit(0);
+}
+
+// Startup: detect npx vs direct node
+if (process.argv[1]?.includes('.npm/_npx')) {
+  console.error("[startup] Running via npx -- first run may be slow due to package resolution");
+}
+
+// Startup: check heap size
+const heapLimit = v8.getHeapStatistics().heap_size_limit;
+if (heapLimit < 256 * 1024 * 1024) {
+  console.error(`[startup] WARNING: Heap limit is ${Math.round(heapLimit / 1024 / 1024)}MB`);
 }
 
 // ============================================
@@ -392,6 +404,7 @@ class BingAdsManager {
     return rows;
   }
 
+  // Handles escaped quote (double quote "") inside quoted fields, e.g. '"Campaign ""A, B"""'
   private parseCsvLine(line: string): string[] {
     const fields: string[] = [];
     let current = "";
@@ -402,6 +415,7 @@ class BingAdsManager {
       if (inQuotes) {
         if (ch === '"') {
           if (i + 1 < line.length && line[i + 1] === '"') {
+            // Handle double quote escape: "" -> "
             current += '"';
             i++;
           } else {

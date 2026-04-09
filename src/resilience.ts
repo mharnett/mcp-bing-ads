@@ -2,7 +2,7 @@ import {
   retry,
   circuitBreaker,
   wrap,
-  handleAll,
+  handleWhen,
   timeout,
   TimeoutStrategy,
   ExponentialBackoff,
@@ -35,34 +35,38 @@ export const logger = pino({
 const MAX_RESPONSE_SIZE = 200_000; // 200KB
 
 export function safeResponse<T>(data: T, context: string): T {
-  const jsonStr = JSON.stringify(data);
-  const sizeBytes = Buffer.byteLength(jsonStr, "utf-8");
+  let current = data;
+  for (let pass = 0; pass < 10; pass++) {
+    const jsonStr = JSON.stringify(current);
+    const sizeBytes = Buffer.byteLength(jsonStr, "utf-8");
+    if (sizeBytes <= MAX_RESPONSE_SIZE) return current;
 
-  if (sizeBytes > MAX_RESPONSE_SIZE) {
-    logger.warn(
-      { sizeBytes, maxSize: MAX_RESPONSE_SIZE, context },
-      `Response exceeds size limit, truncating`
-    );
+    logger.warn({ sizeBytes, maxSize: MAX_RESPONSE_SIZE, context, pass }, "Response exceeds size limit, truncating");
 
-    // If it's an array, truncate
-    if (Array.isArray(data)) {
-      const truncated = (data as any[]).slice(0, Math.max(1, Math.floor((data as any[]).length * 0.5)));
-      return truncated as T;
+    if (Array.isArray(current)) {
+      current = (current as any[]).slice(0, Math.max(1, Math.floor((current as any[]).length * 0.5))) as T;
+      continue;
     }
 
-    // If it's an object with items/results, truncate those
-    if (typeof data === "object" && data !== null) {
-      const obj = data as Record<string, any>;
-      for (const key of ["items", "results", "data", "rows"]) {
-        if (Array.isArray(obj[key])) {
+    if (typeof current === "object" && current !== null) {
+      const obj = current as Record<string, any>;
+      let truncated = false;
+      for (const key of ["items", "results", "data", "rows", "tags", "triggers", "variables"]) {
+        if (Array.isArray(obj[key]) && obj[key].length > 1) {
           obj[key] = obj[key].slice(0, Math.max(1, Math.floor(obj[key].length * 0.5)));
-          return obj as T;
+          if ("count" in obj) obj.count = obj[key].length;
+          if ("row_count" in obj) obj.row_count = obj[key].length;
+          obj.truncated = true;
+          truncated = true;
+          break;
         }
       }
+      if (truncated) continue;
     }
-  }
 
-  return data;
+    break;
+  }
+  return current;
 }
 
 // ============================================
@@ -74,13 +78,23 @@ const backoff = new ExponentialBackoff({
   maxDelay: 5_000,
 });
 
+const isTransient = handleWhen((err) => {
+  const msg = (err?.message || "").toLowerCase();
+  const code = (err as any)?.code || (err as any)?.status;
+  if (code === 401 || code === 403 || code === 7 || code === 16) return false;
+  if (msg.includes("unauthenticated") || msg.includes("permission_denied") || msg.includes("invalid_grant")) return false;
+  if (code === 429 || msg.includes("rate")) return true;
+  if (code >= 400 && code < 500) return false;
+  return true;
+});
+
 // Individual policies
-const retryPolicy = retry(handleAll, {
+const retryPolicy = retry(isTransient, {
   maxAttempts: 3,
   backoff,
 });
 
-const circuitBreakerPolicy = circuitBreaker(handleAll, {
+const circuitBreakerPolicy = circuitBreaker(isTransient, {
   halfOpenAfter: 60_000, // 60s to attempt recovery
   breaker: new ConsecutiveBreaker(5), // Open after 5 consecutive failures
 });

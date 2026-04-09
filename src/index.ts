@@ -669,8 +669,8 @@ const adsManager = new BingAdsManager(config);
 
 const server = new Server(
   {
-    name: "mcp-bing-ads",
-    version: "1.0.0",
+    name: __cliPkg.name,
+    version: __cliPkg.version,
   },
   {
     capabilities: {
@@ -912,5 +912,15 @@ async function main() {
   await server.connect(transport);
   console.error("[startup] MCP Bing Ads server running");
 }
+
+process.on("SIGTERM", () => {
+  console.error("[shutdown] SIGTERM received, exiting");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.error("[shutdown] SIGINT received, exiting");
+  process.exit(0);
+});
 
 main().catch(console.error);

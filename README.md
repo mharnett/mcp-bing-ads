@@ -8,7 +8,7 @@
 Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Claude to manage Bing/Microsoft Ads accounts with full campaign, ad group, keyword, and performance analysis capabilities.
 
 **Features:**
-- 30+ production-tested tools
+- 10 production-tested tools
 - Campaign, ad group, and keyword management
 - Keyword performance analysis with quality scores
 - Search term reporting & bid automation
@@ -58,10 +58,11 @@ npm install mcp-bing-ads
 
 4. **Set environment variables (recommended):**
    ```bash
+   export BING_ADS_DEVELOPER_TOKEN="your_developer_token"
    export BING_ADS_CLIENT_ID="your_client_id"
+   export BING_ADS_REFRESH_TOKEN="your_refresh_token"
+   # Optional:
    export BING_ADS_CLIENT_SECRET="your_client_secret"
-   export BING_CUSTOMER_ID="your_customer_id"
-   export BING_ACCOUNT_ID="your_account_id"
    ```
 
 ## Usage
@@ -116,23 +117,25 @@ bing_ads_add_shared_negatives({
 
 ## API Reference
 
+### Context
+- `bing_ads_get_client_context(working_directory)` -- Detect account from working directory
+
 ### Campaigns
-- `bing_ads_list_campaigns()` — List all campaigns
-- `bing_ads_get_campaign_performance(start_date, end_date)` — Campaign metrics
-- `bing_ads_update_campaign_budget(campaign_id, daily_budget)` — Update daily spend
+- `bing_ads_list_campaigns()` -- List all campaigns
+- `bing_ads_get_campaign_performance(start_date, end_date)` -- Campaign metrics
+- `bing_ads_update_campaign_budget(campaign_id, daily_budget)` -- Update daily spend
 
 ### Ad Groups
-- `bing_ads_list_ad_groups(campaign_id)` — List ad groups in campaign
+- `bing_ads_list_ad_groups(campaign_id)` -- List ad groups in campaign
 
 ### Keywords
-- `bing_ads_keyword_performance(start_date, end_date, [campaign_ids])` — Keyword metrics & QS
-- `bing_ads_search_term_report(start_date, end_date)` — Search terms that triggered ads
-- `bing_ads_pause_keywords(ad_group_id, keyword_ids)` — Pause keywords
+- `bing_ads_keyword_performance(start_date, end_date, [campaign_ids])` -- Keyword metrics & QS
+- `bing_ads_search_term_report(start_date, end_date)` -- Search terms that triggered ads
+- `bing_ads_pause_keywords(ad_group_id, keyword_ids)` -- Pause keywords
 
 ### Negative Keywords
-- `bing_ads_list_shared_entities([type])` — List shared negative lists
-- `bing_ads_add_shared_negatives(list_id, keywords)` — Add to shared list
-- `bing_ads_add_campaign_negatives(campaign_id, keywords)` — Campaign-level negatives
+- `bing_ads_list_shared_entities([type])` -- List shared negative lists
+- `bing_ads_add_shared_negatives(list_id, keywords)` -- Add to shared list
 
 ### Performance Reports
 - Campaign performance (ROI, conversions, CTR, CPC)
@@ -196,8 +199,8 @@ cp config.example.json config.json
 
 ### `Missing required credentials`
 Check that:
-- `BING_ADS_CLIENT_ID` and `BING_ADS_CLIENT_SECRET` are set (or in config.json)
-- `BING_CUSTOMER_ID` and `BING_ACCOUNT_ID` are provided
+- `BING_ADS_DEVELOPER_TOKEN`, `BING_ADS_CLIENT_ID`, and `BING_ADS_REFRESH_TOKEN` are set
+- `BING_ADS_CLIENT_SECRET` is set (if using a confidential app)
 - OAuth token is valid (expires, may need refresh)
 
 ### `Rate limit exceeded`
@@ -235,6 +238,6 @@ Contributions welcome! Please:
 
 Built with production workloads in mind: resilient API calls (circuit breakers, retry with backoff, response truncation), full Quality Score diagnostics, and negative keyword management at scale.
 
-**Also by Mark:** [mcp-linkedin-ads](https://github.com/mharnett/mcp-linkedin-ads) — LinkedIn Ads MCP server with 65+ tools.
+**Also by Mark:** [mcp-linkedin-ads](https://github.com/mharnett/mcp-linkedin-ads) -- LinkedIn Ads MCP server with 7 tools.
 
 **Last Updated:** 2026-03-13

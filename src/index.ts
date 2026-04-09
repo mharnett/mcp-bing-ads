@@ -30,6 +30,23 @@ try {
   // build-info.json not present (dev mode)
 }
 
+// CLI flags
+const __cliPkg = JSON.parse(readFileSync(join(dirname(new URL(import.meta.url).pathname), "..", "package.json"), "utf-8"));
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`${__cliPkg.name} v${__cliPkg.version}\n`);
+  console.log(`Usage: ${__cliPkg.name} [options]\n`);
+  console.log("MCP server communicating via stdio. Configure in your .mcp.json.\n");
+  console.log("Options:");
+  console.log("  --help, -h       Show this help message");
+  console.log("  --version, -v    Show version number");
+  console.log(`\nDocumentation: https://github.com/mharnett/mcp-bing-ads`);
+  process.exit(0);
+}
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(__cliPkg.version);
+  process.exit(0);
+}
+
 // ============================================
 // CONFIGURATION
 // ============================================

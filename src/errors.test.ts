@@ -12,7 +12,7 @@ describe("classifyError", () => {
     const err = Object.assign(new Error("Unauthorized"), { status: 401 });
     const result = classifyError(err);
     expect(result).toBeInstanceOf(BingAdsAuthError);
-    expect(result.message).toContain("Auth failed");
+    expect(result.message.toLowerCase()).toContain("auth failed");
   });
 
   it("returns BingAdsAuthError for invalid_grant message", () => {

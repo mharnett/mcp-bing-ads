@@ -19,6 +19,7 @@ import {
   validateCredentials,
 } from "./errors.js";
 import { tools } from "./tools.js";
+import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
 import v8 from "v8";
 
@@ -716,7 +717,7 @@ const server = new Server(
 
 // Handle list tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools };
+  return { tools: filterTools(tools) };
 });
 
 // Handle tool calls
@@ -724,6 +725,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    assertWriteAllowed(name);
     // Resolve client from account_id or working directory context
     const resolveClient = (accountId?: string): ClientConfig => {
       if (accountId) {
@@ -960,6 +962,11 @@ async function main() {
     console.error(`[STARTUP WARNING] Auth check FAILED: ${err.message}`);
     console.error(`[STARTUP WARNING] MCP will start but ALL API calls will fail until auth is fixed.`);
   }
+
+  const writeMode = isWriteEnabled();
+  console.error(
+    `[startup] Write mode: ${writeMode ? "ENABLED (mutating tools exposed)" : "DISABLED (read-only; set BING_ADS_MCP_WRITE=true to enable writes)"}`,
+  );
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

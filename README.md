@@ -65,7 +65,23 @@ npm install mcp-bing-ads
    export BING_ADS_REFRESH_TOKEN="your_refresh_token"
    # Optional:
    export BING_ADS_CLIENT_SECRET="your_client_secret"
+   # Optional: opt into mutating tools (read-only by default)
+   export BING_ADS_MCP_WRITE="true"
    ```
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `BING_ADS_DEVELOPER_TOKEN` | yes | -- | Microsoft Advertising developer token |
+| `BING_ADS_CLIENT_ID` | yes | -- | Azure AD app client ID |
+| `BING_ADS_REFRESH_TOKEN` | yes | -- | OAuth refresh token |
+| `BING_ADS_CLIENT_SECRET` | no | -- | Azure AD app client secret (if confidential client) |
+| `BING_ADS_MCP_WRITE` | no | `false` | Set to `true`, `1`, or `yes` to expose mutating tools (pause/update/add). Any other value -- or unset -- keeps the server read-only. |
+
+### Read-only by default
+
+Mutating tools (`bing_ads_pause_keywords`, `bing_ads_update_campaign_budget`, `bing_ads_add_shared_negatives`) are **hidden from the tool list and refused at call time** unless `BING_ADS_MCP_WRITE=true` is set in the server environment. This is a safety gate against casual write actions -- for example, pausing a keyword or editing a budget based on a throwaway chat message. To make write changes, set the env var explicitly in your `.mcp.json` or shell profile for the session that needs it, then unset it afterwards. Read tools (list/report/performance) are always available.
 
 ## Usage
 

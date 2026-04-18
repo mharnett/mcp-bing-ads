@@ -101,7 +101,11 @@ interface Config {
 function loadConfig(): Config {
   const configPath = join(dirname(new URL(import.meta.url).pathname), "..", "config.json");
   if (!existsSync(configPath)) {
-    throw new Error(`Config file not found at ${configPath}. Create config.json from config.example.json with your client entries.`);
+    throw new Error(
+      `Config file not found at ${configPath}. Create config.json from config.example.json with your client entries, ` +
+        `or set env vars BING_ADS_DEVELOPER_TOKEN, BING_ADS_CLIENT_ID, BING_ADS_CLIENT_SECRET, and BING_ADS_REFRESH_TOKEN. ` +
+        `Run 'node get-refresh-token.cjs' to obtain a refresh token.`,
+    );
   }
   return JSON.parse(readFileSync(configPath, "utf-8"));
 }

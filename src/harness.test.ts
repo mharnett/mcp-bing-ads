@@ -1,4 +1,4 @@
-import { registerMcpTests } from "@drak/mcp-test-harness";
+import { registerMcpTests } from "@drak-marketing/mcp-test-harness";
 import { fileURLToPath } from "url";
 import path from "path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

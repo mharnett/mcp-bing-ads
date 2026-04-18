@@ -1,7 +1,7 @@
 {
   "name": "mcp-bing-ads",
   "mcpName": "io.github.mharnett/bing-ads",
-  "version": "1.0.15",
+  "version": "1.1.0",
   "description": "MCP server for Microsoft Advertising (Bing Ads) API with campaign, ad group, keyword, and performance reporting. First comprehensive open-source Bing Ads MCP.",
   "main": "dist/index.js",
   "bin": {
@@ -58,7 +58,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@drak/mcp-test-harness": "file:../mcp-test-harness",
+    "@drak-marketing/mcp-test-harness": "^0.1.2",
     "@types/node": "^20.10.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",

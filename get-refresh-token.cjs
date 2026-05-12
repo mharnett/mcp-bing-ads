@@ -21,8 +21,10 @@ const CLIENT_ID = process.env.BING_ADS_CLIENT_ID;
 const CLIENT_SECRET = process.env.BING_ADS_CLIENT_SECRET;
 const REDIRECT_URI = "http://localhost:3000/callback";
 const SCOPE = "https://ads.microsoft.com/msads.manage offline_access";
-const AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+// Use /consumers/ tenant so Google-federated MSAs show "Sign in with Google".
+// /common/ suppresses third-party federation when an account picker is shown.
+const AUTH_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
+const TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 
 if (!CLIENT_ID) {
   console.error("Set BING_ADS_CLIENT_ID env var first");
@@ -30,7 +32,8 @@ if (!CLIENT_ID) {
 }
 
 const LOGIN_HINT = process.env.BING_ADS_LOGIN_HINT || "";
-const authUrl = `${AUTH_URL}?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&response_mode=query&prompt=select_account${LOGIN_HINT ? "&login_hint=" + encodeURIComponent(LOGIN_HINT) : ""}`;
+// prompt=login forces a fresh sign-in (skips account picker that hides Google option)
+const authUrl = `${AUTH_URL}?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&response_mode=query&prompt=login${LOGIN_HINT ? "&login_hint=" + encodeURIComponent(LOGIN_HINT) : ""}`;
 
 const server = http.createServer(async (req, res) => {
   if (!req.url.startsWith("/callback")) return;

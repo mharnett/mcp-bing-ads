@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync, existsSync, createWriteStream } from "fs";
 import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { pipeline } from "stream/promises";
 import { createGunzip } from "zlib";
 import { tmpdir } from "os";
@@ -24,13 +25,18 @@ import { withResilience, safeResponse, logger } from "./resilience.js";
 import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
+// Resolve this module's directory. Use fileURLToPath, NOT the file URL's
+// pathname property — that yields "/D:/a/..." on Windows, which fs resolves
+// against the current drive as "D:\D:\..." (a doubled-drive path that ENOENTs).
+// fileURLToPath handles drive letters + percent-decoding correctly everywhere.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 // CLI package info
-const __cliPkg = JSON.parse(readFileSync(join(dirname(new URL(import.meta.url).pathname), "..", "package.json"), "utf-8"));
+const __cliPkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 // Log build fingerprint at startup
 try {
-  const __buildInfoDir = dirname(new URL(import.meta.url).pathname);
-  const buildInfo = JSON.parse(readFileSync(join(__buildInfoDir, "build-info.json"), "utf-8"));
+  const buildInfo = JSON.parse(readFileSync(join(__dirname, "build-info.json"), "utf-8"));
   console.error(`[build] SHA: ${buildInfo.sha} (${buildInfo.builtAt})`);
 } catch {
   console.error(`[build] ${__cliPkg.name}@${__cliPkg.version} (dev mode)`);
@@ -100,7 +106,7 @@ interface Config {
 }
 
 function loadConfig(): Config {
-  const configPath = join(dirname(new URL(import.meta.url).pathname), "..", "config.json");
+  const configPath = join(__dirname, "..", "config.json");
   if (!existsSync(configPath)) {
     throw new Error(
       `Config file not found at ${configPath}. Create config.json from config.example.json with your client entries, ` +

@@ -8,6 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync, existsSync, createWriteStream } from "fs";
 import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { pipeline } from "stream/promises";
 import { createGunzip } from "zlib";
 import { tmpdir } from "os";
@@ -21,15 +22,21 @@ import {
 import { tools } from "./tools.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
+import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
+// Resolve this module's directory. Use fileURLToPath, NOT the file URL's
+// pathname property — that yields "/D:/a/..." on Windows, which fs resolves
+// against the current drive as "D:\D:\..." (a doubled-drive path that ENOENTs).
+// fileURLToPath handles drive letters + percent-decoding correctly everywhere.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 // CLI package info
-const __cliPkg = JSON.parse(readFileSync(join(dirname(new URL(import.meta.url).pathname), "..", "package.json"), "utf-8"));
+const __cliPkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 // Log build fingerprint at startup
 try {
-  const __buildInfoDir = dirname(new URL(import.meta.url).pathname);
-  const buildInfo = JSON.parse(readFileSync(join(__buildInfoDir, "build-info.json"), "utf-8"));
+  const buildInfo = JSON.parse(readFileSync(join(__dirname, "build-info.json"), "utf-8"));
   console.error(`[build] SHA: ${buildInfo.sha} (${buildInfo.builtAt})`);
 } catch {
   console.error(`[build] ${__cliPkg.name}@${__cliPkg.version} (dev mode)`);
@@ -99,7 +106,7 @@ interface Config {
 }
 
 function loadConfig(): Config {
-  const configPath = join(dirname(new URL(import.meta.url).pathname), "..", "config.json");
+  const configPath = join(__dirname, "..", "config.json");
   if (!existsSync(configPath)) {
     throw new Error(
       `Config file not found at ${configPath}. Create config.json from config.example.json with your client entries, ` +
@@ -195,13 +202,13 @@ class BingAdsManager {
     if (data.refresh_token && data.refresh_token !== this.refreshToken) {
       this.refreshToken = data.refresh_token;
       if (process.platform === "darwin") {
-        try {
-          const { execFileSync } = await import("child_process");
-          try { execFileSync("security", ["delete-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN"], { stdio: "ignore" }); } catch { /* may not exist yet */ }
-          execFileSync("security", ["add-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN", "-w", data.refresh_token]);
+        // Single atomic upsert (-U). Never delete-then-add: that pattern could
+        // permanently lose this rotating token if the process died between the
+        // two calls (prod incident 2026-06). See keychain.ts.
+        if (persistSecretToKeychain("BING_ADS_REFRESH_TOKEN", data.refresh_token)) {
           console.error("[token] Rotated refresh token persisted to Keychain");
-        } catch (err) {
-          console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain:", err);
+        } else {
+          console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain");
         }
       } else {
         console.error("[token] Rotated refresh token received but Keychain not available (non-macOS). Token will be used for this session only.");

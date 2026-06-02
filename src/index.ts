@@ -21,6 +21,7 @@ import {
 import { tools } from "./tools.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
+import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
 // CLI package info
@@ -195,13 +196,13 @@ class BingAdsManager {
     if (data.refresh_token && data.refresh_token !== this.refreshToken) {
       this.refreshToken = data.refresh_token;
       if (process.platform === "darwin") {
-        try {
-          const { execFileSync } = await import("child_process");
-          try { execFileSync("security", ["delete-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN"], { stdio: "ignore" }); } catch { /* may not exist yet */ }
-          execFileSync("security", ["add-generic-password", "-a", "bing-ads-mcp", "-s", "BING_ADS_REFRESH_TOKEN", "-w", data.refresh_token]);
+        // Single atomic upsert (-U). Never delete-then-add: that pattern could
+        // permanently lose this rotating token if the process died between the
+        // two calls (prod incident 2026-06). See keychain.ts.
+        if (persistSecretToKeychain("BING_ADS_REFRESH_TOKEN", data.refresh_token)) {
           console.error("[token] Rotated refresh token persisted to Keychain");
-        } catch (err) {
-          console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain:", err);
+        } else {
+          console.error("[token] WARNING: Failed to persist rotated refresh token to Keychain");
         }
       } else {
         console.error("[token] Rotated refresh token received but Keychain not available (non-macOS). Token will be used for this session only.");

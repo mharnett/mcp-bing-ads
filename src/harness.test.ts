@@ -16,5 +16,5 @@ registerMcpTests({
   hasPlatform: false,
   requiredEnvVars: ["BING_ADS_DEVELOPER_TOKEN", "BING_ADS_CLIENT_ID", "BING_ADS_REFRESH_TOKEN"],
   envPrefix: "BING_ADS_",
-  sourceLintIgnore: ["index.ts"], // index.ts uses execFileSync for Keychain + new URL for path resolution
+  sourceLintIgnore: ["index.ts", "keychain.ts"], // both use execFileSync for Keychain access (macOS `security`); index.ts also new URL for path resolution
 });

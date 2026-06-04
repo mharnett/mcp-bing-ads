@@ -3,7 +3,7 @@
     "client_id": "YOUR_MICROSOFT_CLIENT_ID",
     "client_secret": "YOUR_MICROSOFT_CLIENT_SECRET",
     "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    "scope": "https://ads.microsoft.com/msads.manage offline_access"
+    "scope": "https://ads.microsoft.com/msads.manage"
   },
   "clients": {
     "default": {

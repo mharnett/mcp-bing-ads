@@ -2,8 +2,8 @@
 # Wrapper to launch Bing Ads MCP with tokens from Keychain
 export BING_ADS_DEVELOPER_TOKEN=$(security find-generic-password -a bing-ads-mcp -s BING_ADS_DEVELOPER_TOKEN -w 2>/dev/null)
 export BING_ADS_CLIENT_ID=$(security find-generic-password -a bing-ads-mcp -s BING_ADS_CLIENT_ID -w 2>/dev/null)
-# client_secret not needed for public client apps (Azure AD rejects it)
-# export BING_ADS_CLIENT_SECRET=$(security find-generic-password -a bing-ads-mcp -s BING_ADS_CLIENT_SECRET -w 2>/dev/null)
+# Azure app switched public -> confidential (2026-06: AADSTS70002 requires client_secret)
+export BING_ADS_CLIENT_SECRET=$(security find-generic-password -a bing-ads-mcp -s BING_ADS_CLIENT_SECRET -w 2>/dev/null)
 export BING_ADS_REFRESH_TOKEN=$(security find-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w 2>/dev/null)
 
 # Fail fast if Keychain lookup returned empty

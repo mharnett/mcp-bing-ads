@@ -15,12 +15,12 @@
  */
 
 const http = require("http");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 
 const CLIENT_ID = process.env.BING_ADS_CLIENT_ID;
 const CLIENT_SECRET = process.env.BING_ADS_CLIENT_SECRET;
 const REDIRECT_URI = "http://localhost:3000/callback";
-const SCOPE = "https://ads.microsoft.com/msads.manage offline_access";
+const SCOPE = "https://ads.microsoft.com/msads.manage offline_access openid email profile";
 const AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
@@ -66,13 +66,27 @@ const server = http.createServer(async (req, res) => {
     const data = await resp.json();
 
     if (data.refresh_token) {
+      let who = "(unknown)";
+      try {
+        if (data.id_token) {
+          const payload = JSON.parse(Buffer.from(data.id_token.split(".")[1], "base64").toString());
+          who = payload.preferred_username || payload.email || payload.upn || payload.name || "(no email claim)";
+        }
+      } catch {}
+      let stored = false;
+      try {
+        execFileSync("security", ["add-generic-password", "-a", "bing-ads-mcp", "-s",
+          "BING_ADS_REFRESH_TOKEN", "-w", data.refresh_token, "-U"]);
+        stored = true;
+      } catch (e) {
+        console.error("Keychain store failed:", e.message);
+      }
       console.log("\n=== SUCCESS ===");
-      console.log("Refresh Token:", data.refresh_token);
-      console.log("\nStore in Keychain with:");
-      console.log(`security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w "${data.refresh_token}"`);
+      console.log(">>> Signed in as:", who, "<<<   (must be drak-api@outlook.com)");
+      console.log(">>> Token stored to keychain:", stored, "| prefix:", data.refresh_token.slice(0, 16));
 
       res.writeHead(200, { "Content-Type": "text/html" });
-      res.end("<h1>Success!</h1><p>Refresh token printed in terminal. You can close this tab.</p>");
+      res.end("<h1>Success!</h1><p>Signed in as " + who + ". Token stored. You can close this tab.</p>");
     } else {
       console.error("No refresh token in response:", data);
       res.writeHead(500);
@@ -88,11 +102,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(3000, () => {
-  console.log("Opening browser for Microsoft sign-in...");
-  console.log("Auth URL:", authUrl);
-  try {
-    execSync(`open "${authUrl}"`);
-  } catch {
-    console.log("Open the URL above in your browser.");
+  if (process.env.BING_ADS_AUTO_OPEN === "1") {
+    try { execSync(`open "${authUrl}"`); } catch {}
   }
+  console.log("\n>>> Do NOT let any other tab hit localhost:3000. <<<");
+  console.log(">>> Copy this URL into an INCOGNITO window and sign in as drak-api@outlook.com:\n");
+  console.log(authUrl);
+  console.log("");
 });

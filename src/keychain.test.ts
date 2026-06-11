@@ -1,47 +1,105 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildKeychainUpsertArgs, persistSecretToKeychain } from "./keychain.js";
+import {
+  buildKeychainUpsertArgs,
+  persistSecretToKeychain,
+  KEYCHAIN_ACCOUNT,
+} from "./keychain";
 
-// The bug class plain unit tests miss here: a future edit reintroducing the
-// delete-then-add rotation, which lost the refresh token if the process died
-// between the two calls (this happened in prod 2026-06). The anchor tests pin
-// the two invariants that prevent it: the write is a single call, and it never
-// issues a delete.
-describe("keychain refresh-token persistence", () => {
-  // ---- unit
-  it("builds an add-generic-password upsert carrying service + secret + -U", () => {
-    const args = buildKeychainUpsertArgs("BING_ADS_REFRESH_TOKEN", "secret123");
-    expect(args[0]).toBe("add-generic-password");
-    expect(args).toContain("-U");
-    expect(args).toContain("BING_ADS_REFRESH_TOKEN");
-    expect(args).toContain("secret123");
-    expect(args).toContain("bing-ads-mcp");
-  });
+describe("keychain token persistence", () => {
+  describe("buildKeychainUpsertArgs", () => {
+    it("builds security command with atomic -U flag", () => {
+      const args = buildKeychainUpsertArgs("test-service", "test-secret");
 
-  // ---- anchor: NEVER delete (regardless of service name) — guards the exact bug
-  it("never issues a delete-generic-password", () => {
-    for (const svc of ["BING_ADS_REFRESH_TOKEN", "ANYTHING_ELSE"]) {
-      expect(buildKeychainUpsertArgs(svc, "x")).not.toContain("delete-generic-password");
-    }
-  });
-
-  // ---- anchor: exactly ONE security call — no delete+add absence window
-  it("persists via exactly one atomic security call", () => {
-    const exec = vi.fn();
-    const ok = persistSecretToKeychain("BING_ADS_REFRESH_TOKEN", "tok", exec);
-    expect(ok).toBe(true);
-    expect(exec).toHaveBeenCalledTimes(1);
-    expect(exec).toHaveBeenCalledWith(
-      "security",
-      expect.arrayContaining(["add-generic-password", "-U"]),
-    );
-  });
-
-  // ---- behavior: a failed write degrades gracefully, never throws
-  it("returns false (does not throw) when the keychain write fails", () => {
-    const exec = vi.fn(() => {
-      throw new Error("keychain locked / ACL denied");
+      // Verify atomic upsert flag is present (prevents lost tokens on delete failure)
+      expect(args).toContain("-U");
+      expect(args).toEqual([
+        "add-generic-password",
+        "-a",
+        KEYCHAIN_ACCOUNT,
+        "-s",
+        "test-service",
+        "-w",
+        "test-secret",
+        "-U",
+      ]);
     });
-    expect(persistSecretToKeychain("BING_ADS_REFRESH_TOKEN", "tok", exec)).toBe(false);
-    expect(exec).toHaveBeenCalledTimes(1);
+
+    it("allows custom account override", () => {
+      const args = buildKeychainUpsertArgs("service", "secret", "custom-account");
+      expect(args).toContain("-a");
+      expect(args).toContain("custom-account");
+    });
+  });
+
+  describe("persistSecretToKeychain", () => {
+    it("returns true on successful upsert", () => {
+      const mockExec = vi.fn(); // Does not throw
+      const result = persistSecretToKeychain("test-service", "test-token", mockExec);
+
+      expect(result).toBe(true);
+      expect(mockExec).toHaveBeenCalledWith(
+        "security",
+        expect.arrayContaining(["-U"]),
+      );
+    });
+
+    it("returns false when keychain access denied (no throw)", () => {
+      const mockExec = vi.fn(() => {
+        throw new Error("Keychain locked");
+      });
+      const result = persistSecretToKeychain(
+        "test-service",
+        "test-token",
+        mockExec,
+      );
+
+      // Critical: must return false, not throw (caller falls back to session token)
+      expect(result).toBe(false);
+    });
+
+    it("uses atomic -U flag (anchor test: prevents delete-then-add race)", () => {
+      const mockExec = vi.fn();
+      persistSecretToKeychain("service", "new-token", mockExec);
+
+      const callArgs = mockExec.mock.calls[0];
+      const keychainArgs = callArgs[1] as string[];
+
+      // Anchor: -U must come AFTER -w, as a single command
+      const wIndex = keychainArgs.indexOf("-w");
+      const uIndex = keychainArgs.indexOf("-U");
+      expect(wIndex).toBeGreaterThanOrEqual(0);
+      expect(uIndex).toBeGreaterThanOrEqual(0);
+      expect(uIndex).toBeGreaterThan(wIndex); // -U appears after secret value
+
+      // Shape test: verify the command is a single atomic upsert, not delete+add pattern
+      expect(keychainArgs).toContain("add-generic-password");
+      expect(keychainArgs).not.toContain("delete-generic-password");
+    });
+
+    it("rotates token correctly (old is replaced atomically)", () => {
+      const mockExec = vi.fn();
+
+      // Simulate Microsoft's rotating refresh token behavior
+      persistSecretToKeychain("bing-refresh", "old-token-abc123", mockExec);
+      expect(mockExec).toHaveBeenCalledTimes(1);
+
+      persistSecretToKeychain("bing-refresh", "new-token-def456", mockExec);
+      expect(mockExec).toHaveBeenCalledTimes(2);
+
+      // Both calls should use the atomic -U upsert
+      for (const call of mockExec.mock.calls) {
+        const args = call[1] as string[];
+        expect(args).toContain("-U");
+      }
+    });
+
+    it("passes service name correctly to keychain", () => {
+      const mockExec = vi.fn();
+      persistSecretToKeychain("bing-refresh", "token123", mockExec);
+
+      const keychainArgs = mockExec.mock.calls[0][1] as string[];
+      const sIndex = keychainArgs.indexOf("-s");
+      expect(keychainArgs[sIndex + 1]).toBe("bing-refresh");
+    });
   });
 });

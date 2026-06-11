@@ -105,15 +105,23 @@ const retryPolicy = retry(isTransient, {
   backoff,
 });
 
-const circuitBreakerPolicy = circuitBreaker(isTransient, {
-  halfOpenAfter: 60_000, // 60s to attempt recovery
-  breaker: new ConsecutiveBreaker(5), // Open after 5 consecutive failures
-});
-
 const timeoutPolicy = timeout(30_000, TimeoutStrategy.Aggressive);
 
-// Combine policies: timeout -> circuit breaker -> retry
-const policy = wrap(timeoutPolicy, circuitBreakerPolicy, retryPolicy);
+// Per-operation circuit breakers: isolate failures so one flaky endpoint
+// doesn't block all operations. Map<operationName, policy>
+const policyCache = new Map<string, any>();
+
+function getPolicyForOperation(operationName: string) {
+  if (!policyCache.has(operationName)) {
+    const breaker = circuitBreaker(isTransient, {
+      halfOpenAfter: 60_000, // 60s to attempt recovery
+      breaker: new ConsecutiveBreaker(5), // Open after 5 consecutive failures
+    });
+    const policy = wrap(timeoutPolicy, breaker, retryPolicy);
+    policyCache.set(operationName, policy);
+  }
+  return policyCache.get(operationName);
+}
 
 // ============================================
 // WRAPPED API CALL WITH LOGGING
@@ -126,6 +134,7 @@ export async function withResilience<T>(
   try {
     logger.debug({ operation: operationName }, "Starting API call");
 
+    const policy = getPolicyForOperation(operationName);
     const result = await policy.execute(() => fn());
 
     logger.debug({ operation: operationName }, "API call succeeded");

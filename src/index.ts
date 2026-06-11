@@ -867,7 +867,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_pause_keywords": {
-        const client = resolveClient(args?.account_id as string);
+        const accountId = args?.account_id as string;
+        if (!accountId) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "account_id is required for pause_keywords (write operation)",
+                hint: "Specify the target account ID explicitly to prevent routing to the wrong account",
+              }, null, 2),
+            }],
+            isError: true,
+          };
+        }
+        const client = resolveClient(accountId);
         const result = await adsManager.pauseKeywords(
           client,
           args?.ad_group_id as string,
@@ -896,7 +909,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_add_shared_negatives": {
-        const client = resolveClient(args?.account_id as string);
+        const accountId = args?.account_id as string;
+        if (!accountId) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "account_id is required for add_shared_negatives (write operation)",
+                hint: "Specify the target account ID explicitly to prevent routing to the wrong account",
+              }, null, 2),
+            }],
+            isError: true,
+          };
+        }
+        const client = resolveClient(accountId);
         const result = await adsManager.addSharedNegatives(
           client,
           args?.shared_list_id as string,
@@ -911,7 +937,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "bing_ads_update_campaign_budget": {
-        const client = resolveClient(args?.account_id as string);
+        const accountId = args?.account_id as string;
+        if (!accountId) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "account_id is required for update_campaign_budget (write operation)",
+                hint: "Specify the target account ID explicitly to prevent routing to the wrong account",
+              }, null, 2),
+            }],
+            isError: true,
+          };
+        }
+        const client = resolveClient(accountId);
         const result = await adsManager.updateCampaignBudget(
           client,
           args?.campaign_id as string,

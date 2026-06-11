@@ -89,16 +89,16 @@ export const tools: Tool[] = [
   },
   {
     name: "bing_ads_pause_keywords",
-    description: "Pause one or more keywords by setting their status to Paused. Requires ad group ID and keyword IDs.",
+    description: "Pause one or more keywords by setting their status to Paused. Requires account ID, ad group ID, and keyword IDs.",
     inputSchema: {
       additionalProperties: false,
       type: "object",
       properties: {
-        account_id: { type: "string", description: "The account ID (uses context if not provided)" },
+        account_id: { type: "string", description: "The Bing Ads account ID (REQUIRED for write operations)" },
         ad_group_id: { type: "string", description: "The ad group containing the keywords" },
         keyword_ids: { type: "array", items: { type: "string" }, description: "Array of keyword IDs to pause" },
       },
-      required: ["ad_group_id", "keyword_ids"],
+      required: ["account_id", "ad_group_id", "keyword_ids"],
     },
   },
   {
@@ -120,7 +120,7 @@ export const tools: Tool[] = [
       additionalProperties: false,
       type: "object",
       properties: {
-        account_id: { type: "string", description: "The account ID (uses context if not provided)" },
+        account_id: { type: "string", description: "The Bing Ads account ID (REQUIRED for write operations)" },
         shared_list_id: { type: "string", description: "The shared negative keyword list ID to add negatives to" },
         keywords: {
           type: "array",
@@ -135,7 +135,7 @@ export const tools: Tool[] = [
           description: "Array of negative keywords to add",
         },
       },
-      required: ["shared_list_id", "keywords"],
+      required: ["account_id", "shared_list_id", "keywords"],
     },
   },
   {
@@ -145,11 +145,11 @@ export const tools: Tool[] = [
       additionalProperties: false,
       type: "object",
       properties: {
-        account_id: { type: "string", description: "The account ID (uses context if not provided)" },
+        account_id: { type: "string", description: "The Bing Ads account ID (REQUIRED for write operations)" },
         campaign_id: { type: "string", description: "The numeric string campaign ID to update" },
         daily_budget: { type: "number", description: "New daily budget in dollars (e.g. 50.00 for $50/day)" },
       },
-      required: ["campaign_id", "daily_budget"],
+      required: ["account_id", "campaign_id", "daily_budget"],
     },
   },
 ];

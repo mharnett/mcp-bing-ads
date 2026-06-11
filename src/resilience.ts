@@ -40,6 +40,32 @@ export const logger = pino(
 
 const MAX_RESPONSE_SIZE = 200_000; // 200KB
 
+function truncateArraysRecursively(obj: any, depth: number = 0): boolean {
+  if (depth > 30) return false; // Prevent infinite recursion
+
+  let truncated = false;
+
+  if (Array.isArray(obj)) {
+    if (obj.length > 1) {
+      // Truncate to 50% of original length, keeping at least 1 item
+      const newLength = Math.max(1, Math.floor(obj.length * 0.5));
+      obj.splice(newLength);
+      return true;
+    }
+  } else if (typeof obj === "object" && obj !== null) {
+    // Recursively truncate all arrays found in object
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (truncateArraysRecursively(obj[key], depth + 1)) {
+          truncated = true;
+        }
+      }
+    }
+  }
+
+  return truncated;
+}
+
 export function safeResponse<T>(data: T, context: string): T {
   let current = data;
   for (let pass = 0; pass < 10; pass++) {
@@ -54,27 +80,15 @@ export function safeResponse<T>(data: T, context: string): T {
 
     logger.warn({ sizeBytes, maxSize: MAX_RESPONSE_SIZE, context, pass }, "Response exceeds size limit, truncating");
 
-    if (Array.isArray(current)) {
-      current = (current as any[]).slice(0, Math.max(1, Math.floor((current as any[]).length * 0.5))) as T;
+    // Recursively truncate any arrays found (not just known keys)
+    if (truncateArraysRecursively(current)) {
+      if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+        (current as any).truncated = true;
+      }
       continue;
     }
 
-    if (typeof current === "object" && current !== null) {
-      const obj = current as Record<string, any>;
-      let truncated = false;
-      for (const key of ["items", "results", "data", "rows", "tags", "triggers", "variables"]) {
-        if (Array.isArray(obj[key]) && obj[key].length > 1) {
-          obj[key] = obj[key].slice(0, Math.max(1, Math.floor(obj[key].length * 0.5)));
-          if ("count" in obj) obj.count = obj[key].length;
-          if ("row_count" in obj) obj.row_count = obj[key].length;
-          obj.truncated = true;
-          truncated = true;
-          break;
-        }
-      }
-      if (truncated) continue;
-    }
-
+    // Can't truncate further
     break;
   }
   return current;

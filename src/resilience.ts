@@ -110,7 +110,7 @@ const circuitBreakerPolicy = circuitBreaker(isTransient, {
   breaker: new ConsecutiveBreaker(5), // Open after 5 consecutive failures
 });
 
-const timeoutPolicy = timeout(30_000, TimeoutStrategy.Cooperative);
+const timeoutPolicy = timeout(30_000, TimeoutStrategy.Aggressive);
 
 // Combine policies: timeout -> circuit breaker -> retry
 const policy = wrap(timeoutPolicy, circuitBreakerPolicy, retryPolicy);

@@ -8,7 +8,7 @@ import { createWriteGate } from "mcp-write-gate";
  * Adding a new tool? Put it in this set if it creates, modifies, pauses,
  * enables, removes, links, unlinks, or applies anything.
  */
-const WRITE_TOOLS: ReadonlySet<string> = new Set([
+export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   "bing_ads_add_shared_negatives",
   "bing_ads_pause_keywords",
   "bing_ads_update_campaign_budget",

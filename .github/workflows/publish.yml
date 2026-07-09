@@ -1,0 +1,63 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  # Manual fallback: release-please's GITHUB_TOKEN can't trigger downstream
+  # workflows (anti-loop protection), so the release event from a release-
+  # please-created Release doesn't fire this workflow. workflow_dispatch
+  # lets us publish manually.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or ref to publish (e.g. the release tag)'
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishing (OIDC) requires npm >= 11.5. setup-node@v4 ships
+      # ~npm 10.x with Node 20, which is too old. Pin npm@11 (>=11.5,
+      # OIDC-capable) rather than npm@latest: npm@12 dropped Node 20
+      # (engine ^22.22.2 || ^24.15.0 || >=26) → EBADENGINE. npm@11's engine
+      # is ^20.17.0 || >=22.9.0, compatible with the pinned Node 20 runner.
+      - run: npm install -g npm@11
+
+      - run: npm ci
+      - run: npm run build
+
+      # Trusted Publishing: npm authenticates via the OIDC token from
+      # `id-token: write`. NO NPM_TOKEN — requires a Trusted Publisher
+      # registered on npmjs.com for this package (owner/repo/workflow).
+      # Until that registration exists this step fails; register first.
+      - run: npm publish --provenance --access public

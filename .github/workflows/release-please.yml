@@ -1,0 +1,29 @@
+name: release-please
+
+# Opens / updates a Release PR based on conventional commits on main.
+# When you merge the Release PR, it tags + creates a GitHub Release,
+# which in turn triggers publish.yml to push to npm via OIDC.
+#
+# Manifest mode: the last-released version is pinned in
+# .release-please-manifest.json so release-please proposes the NEXT version
+# in a single cycle instead of rolling history up into a re-release.
+#
+# Conventional commit prefixes that drive version bumps:
+#   feat:  → minor bump   fix: → patch bump   feat!: / BREAKING CHANGE: → major
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

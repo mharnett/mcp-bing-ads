@@ -22,6 +22,7 @@ import {
 import { tools } from "./tools.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
+import { pollUntilReportReady } from "./report.js";
 import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
@@ -455,24 +456,11 @@ class BingAdsManager {
   }
 
   async waitForReport(client: ClientConfig, requestId: string, maxWaitMs: number = 120000): Promise<any[]> {
-    const start = Date.now();
-    const pollInterval = 2000;
-
-    while (Date.now() - start < maxWaitMs) {
-      const result = await this.pollReport(client, requestId);
-
-      if (result.status === "Success" && result.url) {
-        return await this.downloadAndParseCsv(result.url);
-      }
-      if (result.status === "Error") {
-        throw new Error("Report generation failed");
-      }
-
-      // Wait before polling again
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    }
-
-    throw new Error(`Report timed out after ${maxWaitMs}ms`);
+    return pollUntilReportReady(
+      () => this.pollReport(client, requestId),
+      (url) => this.downloadAndParseCsv(url),
+      maxWaitMs,
+    );
   }
 
   // ============================================

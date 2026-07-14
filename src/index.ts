@@ -20,6 +20,11 @@ import {
   validateCredentials,
 } from "./errors.js";
 import { tools } from "./tools.js";
+import {
+  buildPauseKeywordsRequest,
+  buildAddSharedNegativesRequest,
+  buildUpdateCampaignBudgetRequest,
+} from "./mutationRequests.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
 import { persistSecretToKeychain } from "./keychain.js";
@@ -228,14 +233,14 @@ class BingAdsManager {
     };
   }
 
-  private async apiCall(url: string, body: any, client: ClientConfig, operationName: string = "apiCall"): Promise<any> {
+  private async apiCall(url: string, body: any, client: ClientConfig, operationName: string = "apiCall", method: string = "POST"): Promise<any> {
     return withResilience(async () => {
       const token = await this.getAccessToken();
       const headers = this.getHeaders(client);
       headers["Authorization"] = `Bearer ${token}`;
 
       const resp = await fetch(url, {
-        method: "POST",
+        method,
         headers,
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),
@@ -652,16 +657,8 @@ class BingAdsManager {
   // ============================================
 
   async pauseKeywords(client: ClientConfig, adGroupId: string, keywordIds: string[]): Promise<any> {
-    const url = `${CAMPAIGN_MGMT_BASE}/Keywords/UpdateKeywords`;
-    const keywords = keywordIds.map(id => ({
-      Id: parseInt(id),
-      Status: "Paused",
-    }));
-    const body = {
-      AdGroupId: adGroupId,
-      Keywords: keywords,
-    };
-    return await this.apiCall(url, body, client, "pauseKeywords");
+    const req = buildPauseKeywordsRequest(adGroupId, keywordIds);
+    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "pauseKeywords", req.method);
   }
 
   async listSharedEntities(client: ClientConfig, entityType: string = "NegativeKeywordList"): Promise<any> {
@@ -673,33 +670,13 @@ class BingAdsManager {
   }
 
   async addSharedNegatives(client: ClientConfig, sharedListId: string, keywords: Array<{ text: string; match_type?: string }>): Promise<any> {
-    const url = `${CAMPAIGN_MGMT_BASE}/SharedListItems/Add`;
-    const listItems = keywords.map(kw => ({
-      Type: "NegativeKeyword",
-      Text: kw.text,
-      MatchType: kw.match_type || "Phrase",
-    }));
-    const body = {
-      SharedList: {
-        Id: parseInt(sharedListId),
-        Type: "NegativeKeywordList",
-      },
-      ListItems: listItems,
-    };
-    return await this.apiCall(url, body, client, "addSharedNegatives");
+    const req = buildAddSharedNegativesRequest(sharedListId, keywords);
+    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "addSharedNegatives", req.method);
   }
 
   async updateCampaignBudget(client: ClientConfig, campaignId: string, dailyBudget: number): Promise<any> {
-    const url = `${CAMPAIGN_MGMT_BASE}/Campaigns/Update`;
-    const body = {
-      AccountId: client.account_id,
-      Campaigns: [{
-        Id: parseInt(campaignId),
-        DailyBudget: dailyBudget,
-        BudgetType: "DailyBudgetStandard",
-      }],
-    };
-    return await this.apiCall(url, body, client, "updateCampaignBudget");
+    const req = buildUpdateCampaignBudgetRequest(client.account_id, campaignId, dailyBudget);
+    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "updateCampaignBudget", req.method);
   }
 
   getConfig(): Config {

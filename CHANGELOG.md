@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.1.1...mcp-bing-ads-v1.2.0) (2026-07-22)
+
+
+### Features
+
+* read shared-list contents and campaign associations ([#9](https://github.com/mharnett/mcp-bing-ads/issues/9)) ([d7313f3](https://github.com/mharnett/mcp-bing-ads/commit/d7313f3a3f436b0bdbfb306b79d2395b1c219c20))
+
+
+### Bug Fixes
+
+* correct REST mutation URLs that 404ed on all three write tools ([#8](https://github.com/mharnett/mcp-bing-ads/issues/8)) ([ca43dd4](https://github.com/mharnett/mcp-bing-ads/commit/ca43dd471af04b07432e5a380575ec535a166901))
+* zero-row reports (Success with no ReportDownloadUrl) hang until timeout ([#6](https://github.com/mharnett/mcp-bing-ads/issues/6)) ([e4bb325](https://github.com/mharnett/mcp-bing-ads/commit/e4bb325b07b5beb703bb117ce8cb75539aca4090))
+
 ## [1.1.1](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.1.0...mcp-bing-ads-v1.1.1) (2026-07-09)
 
 

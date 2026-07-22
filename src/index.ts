@@ -21,6 +21,11 @@ import {
 } from "./errors.js";
 import { tools } from "./tools.js";
 import {
+  buildGetListItemsRequest,
+  buildGetSharedEntityAssociationsRequests,
+  mergeAssociationResponses,
+} from "./readRequests.js";
+import {
   buildPauseKeywordsRequest,
   buildAddSharedNegativesRequest,
   buildUpdateCampaignBudgetRequest,
@@ -657,6 +662,23 @@ class BingAdsManager {
     return await this.apiCall(url, body, client, "listSharedEntities");
   }
 
+  async getSharedListItems(client: ClientConfig, sharedListId: string, sharedListType?: string): Promise<any> {
+    const req = buildGetListItemsRequest(sharedListId, sharedListType);
+    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "getSharedListItems", req.method);
+  }
+
+  async getSharedEntityAssociations(client: ClientConfig, sharedEntityIds: string[], entityType?: string, sharedEntityType?: string): Promise<any> {
+    // The API takes one id per call, so fan out and merge. Sequential on
+    // purpose: these lists are small and the account is shared with live
+    // campaigns, so a burst of parallel calls risks throttling for no gain.
+    const reqs = buildGetSharedEntityAssociationsRequests(sharedEntityIds, entityType, sharedEntityType);
+    const responses = [];
+    for (const req of reqs) {
+      responses.push(await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "getSharedEntityAssociations", req.method));
+    }
+    return mergeAssociationResponses(responses);
+  }
+
   async addSharedNegatives(client: ClientConfig, sharedListId: string, keywords: Array<{ text: string; match_type?: string }>): Promise<any> {
     const req = buildAddSharedNegativesRequest(sharedListId, keywords);
     return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "addSharedNegatives", req.method);
@@ -864,6 +886,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const result = await adsManager.listSharedEntities(
           client,
           (args?.entity_type as string) || "NegativeKeywordList",
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_get_shared_list_items": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.getSharedListItems(
+          client,
+          args?.shared_list_id as string,
+          args?.shared_list_type as string | undefined,
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_get_shared_entity_associations": {
+        const client = resolveClient(args?.account_id as string);
+        const result = await adsManager.getSharedEntityAssociations(
+          client,
+          args?.shared_entity_ids as string[],
+          args?.entity_type as string | undefined,
+          args?.shared_entity_type as string | undefined,
         );
         return {
           content: [{

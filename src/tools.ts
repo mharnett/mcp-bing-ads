@@ -114,6 +114,39 @@ export const tools: Tool[] = [
     },
   },
   {
+    name: "bing_ads_get_shared_list_items",
+    description: "Get the negative keywords held in a shared negative keyword list. Use this to audit what a list actually blocks — bing_ads_list_shared_entities returns only an item count. Call it first to get list IDs.",
+    inputSchema: {
+      additionalProperties: false,
+      type: "object",
+      properties: {
+        account_id: { type: "string", description: "The account ID (uses context if not provided)" },
+        shared_list_id: { type: "string", description: "The shared list ID to read items from" },
+        shared_list_type: { type: "string", description: "Shared list type, defaults to NegativeKeywordList", default: "NegativeKeywordList" },
+      },
+      required: ["shared_list_id"],
+    },
+  },
+  {
+    name: "bing_ads_get_shared_entity_associations",
+    description: "Get the campaigns a shared negative keyword list is attached to. Use this to detect a list attached to the very campaign built to target those terms, which silently blocks its own keywords. bing_ads_list_shared_entities returns only an AssociationCount, not which campaigns.",
+    inputSchema: {
+      additionalProperties: false,
+      type: "object",
+      properties: {
+        account_id: { type: "string", description: "The account ID (uses context if not provided)" },
+        shared_entity_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "One or more shared list IDs. The API allows one per call, so several ids are fanned out and merged automatically.",
+        },
+        entity_type: { type: "string", description: "What the list is attached TO, defaults to Campaign", default: "Campaign" },
+        shared_entity_type: { type: "string", description: "What the list IS, defaults to NegativeKeywordList", default: "NegativeKeywordList" },
+      },
+      required: ["shared_entity_ids"],
+    },
+  },
+  {
     name: "bing_ads_add_shared_negatives",
     description: "Add negative keywords to a shared negative keyword list. Use phrase match by default (wrap in quotes). Call bing_ads_list_shared_entities first to get list IDs.",
     inputSchema: {

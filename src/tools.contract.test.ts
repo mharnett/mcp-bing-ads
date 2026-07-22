@@ -10,6 +10,8 @@ const EXPECTED_TOOL_NAMES = [
   "bing_ads_search_term_report",
   "bing_ads_pause_keywords",
   "bing_ads_list_shared_entities",
+  "bing_ads_get_shared_list_items",
+  "bing_ads_get_shared_entity_associations",
   "bing_ads_add_shared_negatives",
   "bing_ads_update_campaign_budget",
 ];

@@ -32,7 +32,7 @@ import {
 } from "./mutationRequests.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
-import { pollUntilReportReady } from "./report.js";
+import { pollUntilReportReady, buildReportScope } from "./report.js";
 import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
@@ -531,15 +531,7 @@ class BingAdsManager {
     const [startYear, startMonth, startDay] = options.startDate.split("-").map(Number);
     const [endYear, endMonth, endDay] = options.endDate.split("-").map(Number);
 
-    const scope: any = {
-      AccountIds: [parseInt(client.account_id)],
-    };
-    if (options.campaignIds && options.campaignIds.length > 0) {
-      scope.Campaigns = options.campaignIds.map(id => ({
-        AccountId: parseInt(client.account_id),
-        CampaignId: parseInt(id),
-      }));
-    }
+    const scope: any = buildReportScope(client.account_id, options.campaignIds);
 
     const reportRequest = {
       Type: "KeywordPerformanceReportRequest",
@@ -593,15 +585,7 @@ class BingAdsManager {
     const [startYear, startMonth, startDay] = options.startDate.split("-").map(Number);
     const [endYear, endMonth, endDay] = options.endDate.split("-").map(Number);
 
-    const scope: any = {
-      AccountIds: [parseInt(client.account_id)],
-    };
-    if (options.campaignIds && options.campaignIds.length > 0) {
-      scope.Campaigns = options.campaignIds.map(id => ({
-        AccountId: parseInt(client.account_id),
-        CampaignId: parseInt(id),
-      }));
-    }
+    const scope: any = buildReportScope(client.account_id, options.campaignIds);
 
     const reportRequest = {
       Type: "SearchQueryPerformanceReportRequest",

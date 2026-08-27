@@ -38,3 +38,33 @@ export async function pollUntilReportReady(
 
   throw new Error(`Report timed out after ${maxWaitMs}ms`);
 }
+
+/**
+ * Build the report scope for a Bing Ads report request.
+ *
+ * Bing's AccountThroughCampaignReportScope treats `AccountIds` and `Campaigns` as
+ * MUTUALLY EXCLUSIVE. If both are sent the account-wide scope wins: the campaign
+ * filter is silently ignored, the request still succeeds, and the report comes
+ * back containing every campaign in the account. There is no error and nothing in
+ * the response marks the rows as unfiltered, so a caller that trusts the parameter
+ * is quietly working with the wrong data set.
+ *
+ * Origin: 2026-08-26 — `bing_ads_keyword_performance` with campaign_ids for
+ * bing_bofu_nonprofit_core returned bing_bofu_neon_crm_brand rows as well. Callers
+ * had to filter client-side on CampaignId to get a correct answer.
+ */
+export function buildReportScope(
+  accountId: string,
+  campaignIds?: string[],
+): { AccountIds?: number[]; Campaigns?: Array<{ AccountId: number; CampaignId: number }> } {
+  const account = parseInt(accountId);
+  if (campaignIds && campaignIds.length > 0) {
+    return {
+      Campaigns: campaignIds.map((id) => ({
+        AccountId: account,
+        CampaignId: parseInt(id),
+      })),
+    };
+  }
+  return { AccountIds: [account] };
+}

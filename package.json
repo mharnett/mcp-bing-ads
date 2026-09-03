@@ -25,7 +25,8 @@
     "build": "tsc && node -e \"fs=require('fs');cp=require('child_process');sha=cp.execSync('git rev-parse --short HEAD 2>/dev/null||echo unknown').toString().trim();fs.writeFileSync('dist/build-info.json',JSON.stringify({sha,builtAt:new Date().toISOString()}))\"",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "test": "vitest run"
+    "test": "vitest run && npm run test:shell",
+    "test:shell": "bash tests/run-mcp-keychain.test.sh"
   },
   "keywords": [
     "mcp",

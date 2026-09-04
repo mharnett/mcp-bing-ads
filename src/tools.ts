@@ -185,4 +185,32 @@ export const tools: Tool[] = [
       required: ["account_id", "campaign_id", "daily_budget"],
     },
   },
+  {
+    name: "bing_ads_update_ad_group_cpc_bid",
+    description:
+      "Update an ad group's max CPC bid (CpcBid.Amount). Max CPC lives at AD GROUP level in Bing — " +
+      "there is no campaign-level max CPC — so changing 'the campaign's max CPC' means calling this " +
+      "once per ad group. Use bing_ads_list_ad_groups first to get the ad group IDs and their current " +
+      "bids. NOTE: if the ad group's BiddingScheme is EnhancedCpc (or any auto strategy), this value " +
+      "is a BASE bid that Bing adjusts up and down, not a hard ceiling — and lowering it reduces ad " +
+      "rank, so it cuts volume as well as cost.",
+    inputSchema: {
+      additionalProperties: false,
+      type: "object",
+      properties: {
+        account_id: { type: "string", description: "The Bing Ads account ID (REQUIRED for write operations)" },
+        campaign_id: { type: "string", description: "The numeric string campaign ID the ad group belongs to" },
+        ad_group_id: { type: "string", description: "The numeric string ad group ID to update" },
+        cpc_bid: { type: "number", description: "New max CPC bid in dollars (e.g. 10.00 for $10)" },
+        expected_current_bid: {
+          type: "number",
+          description:
+            "The ad group's CURRENT CpcBid.Amount as you last read it. The call is refused if the live " +
+            "bid differs, so a change computed against stale state cannot silently overwrite someone " +
+            "else's. Read it from bing_ads_list_ad_groups; do not guess.",
+        },
+      },
+      required: ["account_id", "campaign_id", "ad_group_id", "cpc_bid", "expected_current_bid"],
+    },
+  },
 ];

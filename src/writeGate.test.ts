@@ -136,3 +136,30 @@ describe("writeGate", () => {
     expect(WRITE_DISABLED_MESSAGE).toContain("BING_ADS_MCP_WRITE=true");
   });
 });
+
+// A bid write is the highest-blast-radius mutation this server exposes: unlike
+// a budget, an over-large bid has no daily cap to bound the damage. Pin its
+// classification explicitly rather than relying only on the coverage test
+// above, which would still pass if the tool were mis-filed under READ_TOOLS.
+describe("bing_ads_update_ad_group_cpc_bid is write-gated", () => {
+  it("is classified as a write tool", () => {
+    expect(WRITE_TOOLS.has("bing_ads_update_ad_group_cpc_bid")).toBe(true);
+    expect(isWriteTool("bing_ads_update_ad_group_cpc_bid")).toBe(true);
+  });
+
+  it("is hidden from the tool list when writes are disabled", () => {
+    const names = filterTools(tools, {}).map((t) => t.name);
+    expect(names).not.toContain("bing_ads_update_ad_group_cpc_bid");
+  });
+
+  it("is exposed when BING_ADS_MCP_WRITE=true", () => {
+    const names = filterTools(tools, { BING_ADS_MCP_WRITE: "true" }).map((t) => t.name);
+    expect(names).toContain("bing_ads_update_ad_group_cpc_bid");
+  });
+
+  it("requires expected_current_bid — the guard update_campaign_budget lacks", () => {
+    const tool = tools.find((t) => t.name === "bing_ads_update_ad_group_cpc_bid")!;
+    const schema = tool.inputSchema as any;
+    expect(schema.required).toContain("expected_current_bid");
+  });
+});

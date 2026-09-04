@@ -29,6 +29,8 @@ import {
   buildPauseKeywordsRequest,
   buildAddSharedNegativesRequest,
   buildUpdateCampaignBudgetRequest,
+  buildUpdateAdGroupCpcBidRequest,
+  assertAdGroupBidPrecondition,
 } from "./mutationRequests.js";
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
@@ -673,6 +675,51 @@ class BingAdsManager {
     return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "updateCampaignBudget", req.method);
   }
 
+  /**
+   * Set an ad group's max CPC bid, guarded on both ends.
+   *
+   * Before: the live bid must equal `expectedCurrentBid`, so a change computed
+   * against a stale read is refused rather than applied.
+   *
+   * After: the bid is read back and asserted. `PartialErrors: []` is NOT proof
+   * a write landed on this API — a $400 budget write returned exactly that on
+   * 2026-08-24 and left the value at $100 for two days. Anything that reports
+   * success here has been re-read from the account.
+   */
+  async updateAdGroupCpcBid(
+    client: ClientConfig,
+    campaignId: string,
+    adGroupId: string,
+    cpcBid: number,
+    expectedCurrentBid: number,
+  ): Promise<any> {
+    const before = await this.listAdGroups(client, campaignId);
+    assertAdGroupBidPrecondition(before?.AdGroups ?? [], adGroupId, expectedCurrentBid);
+
+    const req = buildUpdateAdGroupCpcBidRequest(campaignId, adGroupId, cpcBid);
+    const writeResult = await this.apiCall(
+      `${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "updateAdGroupCpcBid", req.method);
+
+    const after = await this.listAdGroups(client, campaignId);
+    const found = (after?.AdGroups ?? []).find((ag: any) => String(ag.Id) === String(adGroupId));
+    const observed = found?.CpcBid?.Amount;
+    const verified = typeof observed === "number" && Math.abs(observed - cpcBid) <= 0.005;
+
+    if (!verified) {
+      throw new Error(
+        `CPC bid write did NOT take on ad group ${adGroupId}: asked for ${cpcBid}, ` +
+        `read back ${JSON.stringify(observed)}. The API reported ` +
+        `${JSON.stringify(writeResult)}, which on this API does not imply the value changed. ` +
+        `Re-apply in the Bing UI and check for a bid-strategy override on the ad group.`,
+      );
+    }
+    return {
+      ...writeResult,
+      _verified: { ad_group_id: adGroupId, ad_group_name: found?.Name ?? null,
+                   previous_bid: expectedCurrentBid, new_bid: observed },
+    };
+  }
+
   getConfig(): Config {
     return this.config;
   }
@@ -957,6 +1004,52 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           client,
           args?.campaign_id as string,
           args?.daily_budget as number,
+        );
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }],
+        };
+      }
+
+      case "bing_ads_update_ad_group_cpc_bid": {
+        const accountId = args?.account_id as string;
+        if (!accountId) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "account_id is required for update_ad_group_cpc_bid (write operation)",
+                hint: "Specify the target account ID explicitly to prevent routing to the wrong account",
+              }, null, 2),
+            }],
+            isError: true,
+          };
+        }
+        // Deliberately not defaulted: a bid change is computed against the
+        // current bid, so "I don't know what it is" must fail, not proceed.
+        if (typeof args?.expected_current_bid !== "number") {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "expected_current_bid is required and must be a number",
+                hint: "Read the ad group's current CpcBid.Amount via bing_ads_list_ad_groups and pass it. "
+                    + "The write is refused if the live bid differs, so a stale read cannot overwrite a "
+                    + "change someone else made.",
+              }, null, 2),
+            }],
+            isError: true,
+          };
+        }
+        const client = resolveClient(accountId);
+        const result = await adsManager.updateAdGroupCpcBid(
+          client,
+          args?.campaign_id as string,
+          args?.ad_group_id as string,
+          args?.cpc_bid as number,
+          args.expected_current_bid as number,
         );
         return {
           content: [{

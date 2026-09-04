@@ -12,6 +12,7 @@ export const WRITE_TOOLS: ReadonlySet<string> = new Set([
   "bing_ads_add_shared_negatives",
   "bing_ads_pause_keywords",
   "bing_ads_update_campaign_budget",
+  "bing_ads_update_ad_group_cpc_bid",
 ]);
 
 const gate = createWriteGate({

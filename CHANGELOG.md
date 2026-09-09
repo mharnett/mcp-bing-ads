@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.2.0...mcp-bing-ads-v1.3.0) (2026-09-04)
+
+
+### Features
+
+* **bidding:** add update_ad_group_cpc_bid with a bid precondition guard ([#12](https://github.com/mharnett/mcp-bing-ads/issues/12)) ([26013cb](https://github.com/mharnett/mcp-bing-ads/commit/26013cb2a84568d87aaeee066ebcc618b7e2bb66))
+
 ## [1.2.0](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.1.1...mcp-bing-ads-v1.2.0) (2026-09-03)
 
 

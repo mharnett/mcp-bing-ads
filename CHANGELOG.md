@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.0...mcp-bing-ads-v1.3.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **device-token:** --keychain-service option; never print the refresh token ([#17](https://github.com/mharnett/mcp-bing-ads/issues/17)) ([1d42c63](https://github.com/mharnett/mcp-bing-ads/commit/1d42c63a7b84feb65d03795a5b9071005deeaa71))
+
 ## [1.3.0](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.2.0...mcp-bing-ads-v1.3.0) (2026-09-04)
 
 

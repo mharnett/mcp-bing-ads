@@ -5,9 +5,10 @@
  *
  * Usage:
  *   1. Set env var: BING_ADS_CLIENT_ID
- *   2. Run: node get-refresh-token-device.cjs
+ *   2. Run: node get-refresh-token-device.cjs [--keychain-service <name>]
  *   3. Go to the URL shown, enter the code, sign in with Google
- *   4. Token is printed and stored in Keychain automatically
+ *   4. Token is stored in Keychain (never printed) under <name>,
+ *      default BING_ADS_REFRESH_TOKEN (the MCP's own token)
  */
 
 const CLIENT_ID = process.env.BING_ADS_CLIENT_ID;
@@ -15,12 +16,61 @@ const SCOPE = "https://ads.microsoft.com/msads.manage offline_access";
 const DEVICE_CODE_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode";
 const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
-if (!CLIENT_ID) {
-  console.error("Set BING_ADS_CLIENT_ID env var first");
-  process.exit(1);
+const KEYCHAIN_ACCOUNT = "bing-ads-mcp";
+const DEFAULT_KEYCHAIN_SERVICE = "BING_ADS_REFRESH_TOKEN";
+
+function parseArgs(argv) {
+  let keychainService = DEFAULT_KEYCHAIN_SERVICE;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--keychain-service") {
+      const name = argv[i + 1];
+      if (!name || name.startsWith("--")) throw new Error("--keychain-service needs a name");
+      keychainService = name;
+      i++;
+    } else {
+      throw new Error(`Unknown argument: ${argv[i]}`);
+    }
+  }
+  return { keychainService };
+}
+
+// Stores the token and reports where. The token itself is never logged:
+// output from this script ends up in terminal scrollback and transcripts.
+function handleRefreshToken(refreshToken, keychainService, { exec, log }) {
+  try {
+    exec("security", [
+      "add-generic-password",
+      "-a",
+      KEYCHAIN_ACCOUNT,
+      "-s",
+      keychainService,
+      "-w",
+      refreshToken,
+      "-U",
+    ]);
+    log(`\nRefresh token saved to Keychain: service ${keychainService}, account ${KEYCHAIN_ACCOUNT}.`);
+    return true;
+  } catch (e) {
+    // e.message from execFileSync echoes the command line, token included.
+    log(`\nFailed to save to Keychain (security exit ${e.status ?? "unknown"}). The token was not printed; run this again.`);
+    return false;
+  }
 }
 
 async function main() {
+  let keychainService;
+  try {
+    ({ keychainService } = parseArgs(process.argv.slice(2)));
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+
+  if (!CLIENT_ID) {
+    console.error("Set BING_ADS_CLIENT_ID env var first");
+    process.exit(1);
+  }
+
   // Step 1: Request device code
   const dcResp = await fetch(DEVICE_CODE_URL, {
     method: "POST",
@@ -82,19 +132,11 @@ async function main() {
 
     if (tokenData.refresh_token) {
       console.log("\n\n=== SUCCESS ===");
-      console.log("Refresh Token:", tokenData.refresh_token);
-
-      // Auto-store in Keychain
-      try {
-        require("child_process").execSync(
-          `security delete-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN 2>/dev/null; security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w '${tokenData.refresh_token}'`
-        );
-        console.log("\nRefresh token saved to Keychain automatically.");
-      } catch (e) {
-        console.log("\nFailed to save to Keychain. Store manually with:");
-        console.log(`security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w "${tokenData.refresh_token}"`);
-      }
-      process.exit(0);
+      const saved = handleRefreshToken(tokenData.refresh_token, keychainService, {
+        exec: (cmd, args) => require("child_process").execFileSync(cmd, args, { stdio: "ignore" }),
+        log: console.log,
+      });
+      process.exit(saved ? 0 : 1);
     }
   }
 
@@ -102,7 +144,11 @@ async function main() {
   process.exit(1);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = { parseArgs, handleRefreshToken };

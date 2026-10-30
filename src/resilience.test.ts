@@ -9,18 +9,38 @@ describe("Resilience", () => {
       expect(result).toEqual(data);
     });
 
-    it("should truncate large arrays", () => {
-      const largeArray = Array.from({ length: 10000 }, (_, i) => ({
+    it("wraps a truncated top-level array with a visible marker and both counts", () => {
+      // ~600KB: three times the limit, the shape a large Bing report returns.
+      const largeArray = Array.from({ length: 4000 }, (_, i) => ({
         id: i,
         name: `item-${i}`,
-        description: "x".repeat(100),
+        description: "x".repeat(120),
       }));
-      const result = safeResponse(largeArray, "test");
-      expect(Array.isArray(result)).toBe(true);
-      // After halving passes the array must be strictly smaller than half the input
-      // (at least one halving pass), and must retain at least 1 element.
-      expect((result as any[]).length).toBeGreaterThanOrEqual(1);
-      expect((result as any[]).length).toBeLessThanOrEqual(largeArray.length / 2);
+      expect(Buffer.byteLength(JSON.stringify(largeArray))).toBeGreaterThan(550_000);
+
+      const result = safeResponse(largeArray, "test") as any;
+
+      expect(Array.isArray(result)).toBe(false);
+      expect(result.truncated).toBe(true);
+      expect(result.original_count).toBe(4000);
+      expect(Array.isArray(result.rows)).toBe(true);
+      expect(result.returned_count).toBe(result.rows.length);
+      expect(result.returned_count).toBeGreaterThanOrEqual(1);
+      expect(result.returned_count).toBeLessThanOrEqual(2000);
+      // Rows kept are the leading rows, unchanged.
+      expect(result.rows[0]).toEqual(largeArray[0]);
+      expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(200_000);
+    });
+
+    it("does not mutate the caller's array when truncating", () => {
+      const largeArray = Array.from({ length: 4000 }, (_, i) => ({ id: i, d: "x".repeat(120) }));
+      safeResponse(largeArray, "test");
+      expect(largeArray.length).toBe(4000);
+    });
+
+    it("returns a small top-level array unchanged (no wrapper)", () => {
+      const rows = [{ id: 1 }, { id: 2 }];
+      expect(safeResponse(rows, "test")).toEqual(rows);
     });
 
     it("should truncate large objects with items array", () => {

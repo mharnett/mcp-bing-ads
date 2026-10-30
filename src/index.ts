@@ -29,6 +29,7 @@ import {
   buildPauseKeywordsRequest,
   buildAddSharedNegativesRequest,
   buildUpdateCampaignBudgetRequest,
+  updateCampaignBudgetVerified,
   buildUpdateAdGroupCpcBidRequest,
   assertAdGroupBidPrecondition,
 } from "./mutationRequests.js";
@@ -672,7 +673,14 @@ class BingAdsManager {
 
   async updateCampaignBudget(client: ClientConfig, campaignId: string, dailyBudget: number): Promise<any> {
     const req = buildUpdateCampaignBudgetRequest(client.account_id, campaignId, dailyBudget);
-    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "updateCampaignBudget", req.method);
+    return await updateCampaignBudgetVerified(
+      {
+        write: () => this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "updateCampaignBudget", req.method),
+        readCampaigns: () => this.listCampaigns(client),
+      },
+      campaignId,
+      dailyBudget,
+    );
   }
 
   /**

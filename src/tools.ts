@@ -32,7 +32,7 @@ export const tools: Tool[] = [
   },
   {
     name: "bing_ads_get_campaign_performance",
-    description: "Get campaign performance metrics (impressions, clicks, CTR, CPC, spend, conversions, revenue) for a date range.",
+    description: "Get campaign performance metrics (impressions, clicks, CTR, CPC, spend, conversions, revenue) for a date range. Returns an array of rows. If the report is too large for one response it is cut and returned as { rows, truncated: true, original_count, returned_count } instead: that result is PARTIAL, so totals summed from it are understated. Narrow the date range or filter by campaign and re-run until truncated is absent.",
     inputSchema: {
       additionalProperties: false,
       type: "object",
@@ -59,7 +59,7 @@ export const tools: Tool[] = [
   },
   {
     name: "bing_ads_keyword_performance",
-    description: "Get keyword performance report with metrics including impressions, clicks, cost, conversions, quality score. Optionally filter by campaign.",
+    description: "Get keyword performance report with metrics including impressions, clicks, cost, conversions, quality score. Optionally filter by campaign. Returns an array of rows. If the report is too large for one response it is cut and returned as { rows, truncated: true, original_count, returned_count } instead: that result is PARTIAL, so totals summed from it are understated. Narrow the date range or filter by campaign and re-run until truncated is absent.",
     inputSchema: {
       additionalProperties: false,
       type: "object",
@@ -74,7 +74,7 @@ export const tools: Tool[] = [
   },
   {
     name: "bing_ads_search_term_report",
-    description: "Get search term report showing actual search queries that triggered ads, with matched keywords and performance metrics.",
+    description: "Get search term report showing actual search queries that triggered ads, with matched keywords and performance metrics. Returns an array of rows. If the report is too large for one response it is cut and returned as { rows, truncated: true, original_count, returned_count } instead: that result is PARTIAL, so totals summed from it are understated. Narrow the date range or filter by campaign and re-run until truncated is absent.",
     inputSchema: {
       additionalProperties: false,
       type: "object",
@@ -173,7 +173,7 @@ export const tools: Tool[] = [
   },
   {
     name: "bing_ads_update_campaign_budget",
-    description: "Update a campaign's daily budget amount. Use bing_ads_list_campaigns first to get the campaign ID and current budget.",
+    description: "Update a campaign's daily budget amount. Use bing_ads_list_campaigns first to get the campaign ID and current budget. The budget is read back after the write; if the live value does not match the request the call returns an error, because the API can report success without changing the value.",
     inputSchema: {
       additionalProperties: false,
       type: "object",

@@ -155,3 +155,49 @@ export function buildUpdateCampaignBudgetRequest(
     },
   };
 }
+
+/**
+ * Write a campaign budget, then read it back and assert it took.
+ *
+ * `PartialErrors: []` is not proof a write landed on this API: a $400 budget
+ * write returned exactly that on 2026-08-24 and left the value at $100 for two
+ * days. So success here means the value was re-read from the account. Fails
+ * closed on a missing campaign or an unreadable budget.
+ *
+ * I/O is injected so the write-then-read ordering and the mismatch path are
+ * unit-testable without the server or a live account.
+ */
+export async function updateCampaignBudgetVerified(
+  deps: {
+    write: () => Promise<any>;
+    readCampaigns: () => Promise<any>;
+  },
+  campaignId: string,
+  dailyBudget: number,
+): Promise<any> {
+  const writeResult = await deps.write();
+  const after = await deps.readCampaigns();
+  const campaigns: Array<Record<string, any>> = after?.Campaigns ?? [];
+  const found = campaigns.find(c => String(c.Id) === String(campaignId));
+  if (!found) {
+    throw new Error(
+      `Campaign ${campaignId} not found when reading the budget back after the write ` +
+      `(the read-back lists Search campaigns only). The write may or may not have taken: ` +
+      `check the budget in the Bing UI.`,
+    );
+  }
+  const observed = found.DailyBudget;
+  const label = found.Name ? `"${found.Name}" (${campaignId})` : `${campaignId}`;
+  if (typeof observed !== "number" || Math.abs(observed - dailyBudget) > BID_EPSILON) {
+    throw new Error(
+      `Budget write did NOT take on campaign ${label}: asked for ${dailyBudget}, ` +
+      `read back ${JSON.stringify(observed)}. The API reported ${JSON.stringify(writeResult)}, ` +
+      `which on this API does not imply the value changed. Re-apply in the Bing UI and check ` +
+      `for a shared budget on the campaign.`,
+    );
+  }
+  return {
+    ...writeResult,
+    _verified: { campaign_id: campaignId, campaign_name: found.Name ?? null, new_budget: observed },
+  };
+}

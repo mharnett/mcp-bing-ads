@@ -64,4 +64,23 @@ describe("Bing Ads MCP tools contract", () => {
     expect(schema.required).toContain("start_date");
     expect(schema.required).toContain("end_date");
   });
+
+  it("report tools warn that a truncated result is partial", () => {
+    for (const name of [
+      "bing_ads_get_campaign_performance",
+      "bing_ads_keyword_performance",
+      "bing_ads_search_term_report",
+    ]) {
+      const d = tools.find((t) => t.name === name)!.description!;
+      expect(d, name).toMatch(/truncated: true/);
+      expect(d, name).toMatch(/original_count/);
+      expect(d, name).toMatch(/returned_count/);
+      expect(d, name).toMatch(/partial/i);
+    }
+  });
+
+  it("update_campaign_budget says the write is read back", () => {
+    const d = tools.find((t) => t.name === "bing_ads_update_campaign_budget")!.description!;
+    expect(d).toMatch(/read back/i);
+  });
 });

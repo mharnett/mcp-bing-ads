@@ -5,6 +5,7 @@ import {
   buildUpdateCampaignBudgetRequest,
   buildUpdateAdGroupCpcBidRequest,
   assertAdGroupBidPrecondition,
+  updateCampaignBudgetVerified,
 } from "./mutationRequests.js";
 
 // Anchors: exact request shapes per the Campaign Management v13 REST reference.
@@ -161,5 +162,51 @@ describe("assertAdGroupBidPrecondition", () => {
   it("tolerates float representation error on an equal bid", () => {
     expect(() => assertAdGroupBidPrecondition(
       [{ Id: "1", Name: "Cents", CpcBid: { Amount: 2.7000000000000002 } }], "1", 2.7)).not.toThrow();
+  });
+});
+
+describe("updateCampaignBudgetVerified", () => {
+  const campaignId = "410393396";
+
+  function deps(readBack: any) {
+    const calls: string[] = [];
+    return {
+      calls,
+      write: async () => { calls.push("write"); return { PartialErrors: [] }; },
+      readCampaigns: async () => { calls.push("read"); return readBack; },
+    };
+  }
+
+  it("reads the budget back after the write and returns the verified value", async () => {
+    const d = deps({ Campaigns: [{ Id: 410393396, Name: "Brand - US", DailyBudget: 262 }] });
+    const result = await updateCampaignBudgetVerified(d, campaignId, 262);
+    expect(d.calls).toEqual(["write", "read"]);
+    expect(result._verified).toEqual({
+      campaign_id: campaignId, campaign_name: "Brand - US", new_budget: 262,
+    });
+    expect(result.PartialErrors).toEqual([]);
+  });
+
+  it("errors when the read-back budget does not match (API said success, value unchanged)", async () => {
+    // 2026-08-24: a $400 write returned PartialErrors: [] and left $100 in place.
+    const d = deps({ Campaigns: [{ Id: 410393396, Name: "Brand - US", DailyBudget: 100 }] });
+    await expect(updateCampaignBudgetVerified(d, campaignId, 400))
+      .rejects.toThrow(/did NOT take.*asked for 400.*read back 100/s);
+    expect(d.calls).toEqual(["write", "read"]);
+  });
+
+  it("errors when the campaign is missing from the read-back", async () => {
+    const d = deps({ Campaigns: [{ Id: 1, Name: "Other", DailyBudget: 400 }] });
+    await expect(updateCampaignBudgetVerified(d, campaignId, 400)).rejects.toThrow(/not found/);
+  });
+
+  it("errors when the read-back budget is unreadable", async () => {
+    const d = deps({ Campaigns: [{ Id: 410393396, Name: "Brand - US" }] });
+    await expect(updateCampaignBudgetVerified(d, campaignId, 400)).rejects.toThrow(/did NOT take/);
+  });
+
+  it("tolerates sub-cent float noise", async () => {
+    const d = deps({ Campaigns: [{ Id: 410393396, Name: "Brand - US", DailyBudget: 262.0000001 }] });
+    await expect(updateCampaignBudgetVerified(d, campaignId, 262)).resolves.toBeDefined();
   });
 });

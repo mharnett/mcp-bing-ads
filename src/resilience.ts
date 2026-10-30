@@ -66,7 +66,37 @@ function truncateArraysRecursively(obj: any, depth: number = 0): boolean {
   return truncated;
 }
 
-export function safeResponse<T>(data: T, context: string): T {
+/**
+ * Shape returned in place of a top-level array that had to be cut to fit.
+ *
+ * A bare array has nowhere to carry a marker, so before this wrapper existed a
+ * truncated report came back as an ordinary-looking, shorter array — and any
+ * spend total summed from it was understated with no warning.
+ */
+export interface TruncatedRows<R = unknown> {
+  rows: R[];
+  truncated: true;
+  original_count: number;
+  returned_count: number;
+}
+
+export function safeResponse<T>(data: T, context: string): T | TruncatedRows {
+  if (Array.isArray(data)) {
+    if (Buffer.byteLength(JSON.stringify(data), "utf-8") <= MAX_RESPONSE_SIZE) return data;
+    const wrapper: TruncatedRows = {
+      rows: JSON.parse(JSON.stringify(data)),
+      truncated: true,
+      original_count: data.length,
+      returned_count: data.length,
+    };
+    const shrunk = shrinkToFit(wrapper, context) as TruncatedRows;
+    shrunk.returned_count = shrunk.rows.length;
+    return shrunk;
+  }
+  return shrinkToFit(data, context);
+}
+
+function shrinkToFit<T>(data: T, context: string): T {
   let current = data;
   for (let pass = 0; pass < 10; pass++) {
     const jsonStr = JSON.stringify(current);
@@ -82,7 +112,7 @@ export function safeResponse<T>(data: T, context: string): T {
 
     // Recursively truncate any arrays found (not just known keys)
     if (truncateArraysRecursively(current)) {
-      if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+      if (typeof current === "object" && current !== null) {
         (current as any).truncated = true;
       }
       continue;

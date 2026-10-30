@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.1...mcp-bing-ads-v1.3.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* mark truncated report arrays; read back budget writes ([#20](https://github.com/mharnett/mcp-bing-ads/issues/20)) ([c59cb88](https://github.com/mharnett/mcp-bing-ads/commit/c59cb88ce17c8f3cf8a8e3e2aa157f2058467383))
+
 ## [1.3.1](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.0...mcp-bing-ads-v1.3.1) (2026-10-27)
 
 

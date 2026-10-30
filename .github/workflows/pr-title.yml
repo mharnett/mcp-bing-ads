@@ -1,0 +1,22 @@
+name: PR title
+
+# Squash merges use the PR title as the commit subject, and release-please
+# only releases conventional-commit subjects (feat:, fix:, ...). A PR titled
+# without a prefix ships nothing until something else forces a release.
+# pull_request (not pull_request_target): only the title is read, so no
+# secrets or write token are needed.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

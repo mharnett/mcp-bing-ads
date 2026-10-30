@@ -2,7 +2,7 @@ name: release-please
 
 # Opens / updates a Release PR based on conventional commits on main.
 # When you merge the Release PR, it tags + creates a GitHub Release,
-# which in turn triggers publish.yml to push to npm via OIDC.
+# and dispatches publish.yml (the step at the bottom) to push to npm via OIDC.
 #
 # Manifest mode: the last-released version is pinned in
 # .release-please-manifest.json so release-please proposes the NEXT version
@@ -18,12 +18,23 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Lets GITHUB_TOKEN dispatch publish.yml below.
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # GITHUB_TOKEN events don't trigger other workflows, except
+      # workflow_dispatch. Publishing stays in publish.yml because npm's
+      # Trusted Publisher is registered to that filename.
+      - name: Dispatch publish.yml
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish.yml --repo ${{ github.repository }} -f ref=${{ steps.release.outputs.tag_name }}

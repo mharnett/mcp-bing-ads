@@ -8,7 +8,7 @@
 Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Claude to manage Bing/Microsoft Ads accounts with full campaign, ad group, keyword, and performance analysis capabilities.
 
 **Features:**
-- **10 tools** -- production-tested
+- **13 tools** (9 read, 4 write) -- production-tested
 - Campaign, ad group, and keyword management
 - Keyword performance analysis with quality scores
 - Search term reporting & bid automation
@@ -16,9 +16,7 @@ Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Cl
 - Campaign-level budget updates
 - Negative keyword management (shared + campaign-level)
 
-**Note:** ⚠️ First open-source Bing Ads MCP with comprehensive tooling
-- No serious alternatives exist in the ecosystem
-- Battle-tested across multiple accounts
+**Note:** Microsoft also publishes an official, read-only Microsoft Advertising MCP server (open pilot). This server adds search term and Quality Score reporting, shared negative list audits, and a small set of guarded write tools.
 
 ## Installation
 
@@ -81,23 +79,23 @@ npm install mcp-bing-ads
 
 ### Read-only by default
 
-Mutating tools (`bing_ads_pause_keywords`, `bing_ads_update_campaign_budget`, `bing_ads_add_shared_negatives`) are **hidden from the tool list and refused at call time** unless `BING_ADS_MCP_WRITE=true` is set in the server environment. This is a safety gate against casual write actions -- for example, pausing a keyword or editing a budget based on a throwaway chat message. To make write changes, set the env var explicitly in your `.mcp.json` or shell profile for the session that needs it, then unset it afterwards. Read tools (list/report/performance) are always available.
+Mutating tools (`bing_ads_pause_keywords`, `bing_ads_update_campaign_budget`, `bing_ads_update_ad_group_cpc_bid`, `bing_ads_add_shared_negatives`) are **hidden from the tool list and refused at call time** unless `BING_ADS_MCP_WRITE=true` is set in the server environment. This is a safety gate against casual write actions -- for example, pausing a keyword or editing a budget based on a throwaway chat message. To make write changes, set the env var explicitly in your `.mcp.json` or shell profile for the session that needs it, then unset it afterwards. Read tools (list/report/performance) are always available.
 
 ## Usage
 
-### Start the server
-```bash
-npm start
-```
-
 ### Use with Claude Code
-Add to `~/.claude.json`:
+The server runs locally over stdio; your MCP client starts it. Add to `~/.claude.json` (or a project `.mcp.json`):
 ```json
 {
   "mcpServers": {
     "bing-ads": {
-      "type": "http",
-      "url": "http://localhost:3002"
+      "command": "npx",
+      "args": ["-y", "mcp-bing-ads"],
+      "env": {
+        "BING_ADS_DEVELOPER_TOKEN": "your_developer_token",
+        "BING_ADS_CLIENT_ID": "your_client_id",
+        "BING_ADS_REFRESH_TOKEN": "your_refresh_token"
+      }
     }
   }
 }
@@ -258,6 +256,6 @@ Contributions welcome! Please:
 
 Built with production workloads in mind: resilient API calls (circuit breakers, retry with backoff, response truncation), full Quality Score diagnostics, and negative keyword management at scale.
 
-**Also by Mark:** [mcp-linkedin-ads](https://github.com/mharnett/mcp-linkedin-ads) -- LinkedIn Ads MCP server with 7 tools.
+**Also by Mark:** [mcp-linkedin-ads](https://github.com/mharnett/mcp-linkedin-ads) -- LinkedIn Ads MCP server with 11 tools.
 
 **Last Updated:** 2026-03-13

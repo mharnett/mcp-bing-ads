@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.2...mcp-bing-ads-v1.3.3) (2026-11-14)
+
+
+### Bug Fixes
+
+* start from env vars alone when config.json is absent ([#24](https://github.com/mharnett/mcp-bing-ads/issues/24)) ([dd3e82c](https://github.com/mharnett/mcp-bing-ads/commit/dd3e82c18b5a735f95cc0f16cf03761ca61ec61e))
+
 ## [1.3.2](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.1...mcp-bing-ads-v1.3.2) (2026-10-30)
 
 

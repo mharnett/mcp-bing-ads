@@ -18,6 +18,43 @@ Production-grade MCP server for Microsoft Advertising (Bing Ads) API. Enables Cl
 
 **Note:** Microsoft also publishes an official, read-only Microsoft Advertising MCP server (open pilot). This server adds search term and Quality Score reporting, shared negative list audits, and a small set of guarded write tools.
 
+## Quick install
+
+Claude Code, one line (replace the placeholder values with your own; see [Configuration](#configuration) for how to get them):
+
+```bash
+claude mcp add --env BING_ADS_DEVELOPER_TOKEN=YOUR_DEVELOPER_TOKEN --env BING_ADS_CLIENT_ID=YOUR_CLIENT_ID --env BING_ADS_REFRESH_TOKEN=YOUR_REFRESH_TOKEN --env BING_ADS_ACCOUNT_ID=YOUR_ACCOUNT_ID --env BING_ADS_CUSTOMER_ID=YOUR_CUSTOMER_ID --transport stdio mcp-bing-ads -- npx -y mcp-bing-ads
+```
+
+Set `BING_ADS_ACCOUNT_ID` and `BING_ADS_CUSTOMER_ID` together, or leave both out. Without them the server starts, but every tool call reports that no account is configured. Add `--env BING_ADS_CLIENT_SECRET=YOUR_CLIENT_SECRET` if your Azure AD app is a confidential client.
+
+The server starts read-only. Set `BING_ADS_MCP_WRITE=true` to expose the tools that change an account.
+
+<details>
+<summary>Claude Desktop</summary>
+
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), then fully quit and restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "mcp-bing-ads": {
+      "command": "npx",
+      "args": ["-y", "mcp-bing-ads"],
+      "env": {
+        "BING_ADS_DEVELOPER_TOKEN": "YOUR_DEVELOPER_TOKEN",
+        "BING_ADS_CLIENT_ID": "YOUR_CLIENT_ID",
+        "BING_ADS_REFRESH_TOKEN": "YOUR_REFRESH_TOKEN",
+        "BING_ADS_ACCOUNT_ID": "YOUR_ACCOUNT_ID",
+        "BING_ADS_CUSTOMER_ID": "YOUR_CUSTOMER_ID"
+      }
+    }
+  }
+}
+```
+
+</details>
+
 ## Installation
 
 ```bash

@@ -20,6 +20,7 @@ import {
   validateCredentials,
 } from "./errors.js";
 import { tools } from "./tools.js";
+import { resolveConfig, type ClientConfig, type Config } from "./config.js";
 import {
   buildGetListItemsRequest,
   buildGetSharedEntityAssociationsRequests,
@@ -100,35 +101,13 @@ const envTrimmed = (key: string): string => (process.env[key] || "").trim().repl
 // CONFIGURATION
 // ============================================
 
-interface ClientConfig {
-  customer_id: string;
-  account_id: string;
-  name: string;
-  folder: string;
-}
-
-interface OAuthConfig {
-  client_id: string;
-  client_secret?: string;
-  token_url: string;
-  scope: string;
-}
-
-interface Config {
-  oauth: OAuthConfig;
-  clients: Record<string, ClientConfig>;
-}
-
 function loadConfig(): Config {
-  const configPath = join(__dirname, "..", "config.json");
-  if (!existsSync(configPath)) {
-    throw new Error(
-      `Config file not found at ${configPath}. Create config.json from config.example.json with your client entries, ` +
-        `or set env vars BING_ADS_DEVELOPER_TOKEN, BING_ADS_CLIENT_ID, BING_ADS_CLIENT_SECRET, and BING_ADS_REFRESH_TOKEN. ` +
-        `Run 'node get-refresh-token.cjs' to obtain a refresh token.`,
-    );
-  }
-  return JSON.parse(readFileSync(configPath, "utf-8"));
+  return resolveConfig({
+    configPath: join(__dirname, "..", "config.json"),
+    env: process.env,
+    exists: existsSync,
+    read: (p) => readFileSync(p, "utf-8"),
+  });
 }
 
 function getClientFromWorkingDir(config: Config, cwd: string): ClientConfig | null {

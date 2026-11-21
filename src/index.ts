@@ -6,7 +6,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { readFileSync, existsSync, createWriteStream } from "fs";
+import { readFileSync, existsSync, createWriteStream, realpathSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { pipeline } from "stream/promises";
@@ -37,6 +37,7 @@ import {
 import { filterTools, assertWriteAllowed, isWriteEnabled } from "./writeGate.js";
 import { withResilience, safeResponse, logger } from "./resilience.js";
 import { pollUntilReportReady, buildReportScope } from "./report.js";
+import { extractCsvFromZip, parseCsv } from "./reportCsv.js";
 import { persistSecretToKeychain } from "./keychain.js";
 import v8 from "v8";
 
@@ -221,7 +222,14 @@ class BingAdsManager {
     };
   }
 
-  private async apiCall(url: string, body: any, client: ClientConfig, operationName: string = "apiCall", method: string = "POST"): Promise<any> {
+  private async apiCall(
+    url: string,
+    body: any,
+    client: ClientConfig,
+    operationName: string = "apiCall",
+    method: string = "POST",
+    options: { idempotent?: boolean } = {},
+  ): Promise<any> {
     return withResilience(async () => {
       const token = await this.getAccessToken();
       const headers = this.getHeaders(client);
@@ -242,7 +250,7 @@ class BingAdsManager {
       }
 
       return await resp.json();
-    }, operationName);
+    }, operationName, options);
   }
 
   private getClientForAccountId(accountId: string): ClientConfig | null {
@@ -308,143 +316,8 @@ class BingAdsManager {
 
     // Parse ZIP to find CSV content
     // ZIP files have local file headers starting with PK\x03\x04
-    const csvContent = await this.extractCsvFromZip(uint8);
-    return this.parseCsv(csvContent);
-  }
-
-  private async extractCsvFromZip(zipData: Uint8Array): Promise<string> {
-    // Simple ZIP extraction - find local file header and extract deflated data
-    // ZIP local file header: PK\x03\x04
-    const decoder = new TextDecoder();
-
-    // Use Node's built-in zlib with a simple approach
-    // The Bing Ads report ZIP typically has one file
-    const { Readable } = await import("stream");
-    const { createInflateRaw } = await import("zlib");
-
-    // Find the local file header
-    let offset = 0;
-    if (zipData[0] !== 0x50 || zipData[1] !== 0x4B || zipData[2] !== 0x03 || zipData[3] !== 0x04) {
-      // Not a ZIP, might be plain text or gzip
-      return decoder.decode(zipData);
-    }
-
-    // Parse local file header
-    const view = new DataView(zipData.buffer, zipData.byteOffset, zipData.byteLength);
-    const compressionMethod = view.getUint16(8, true);
-    const compressedSize = view.getUint32(18, true);
-    const fileNameLength = view.getUint16(26, true);
-    const extraFieldLength = view.getUint16(28, true);
-    const dataOffset = 30 + fileNameLength + extraFieldLength;
-
-    const compressedData = zipData.slice(dataOffset, dataOffset + compressedSize);
-
-    if (compressionMethod === 0) {
-      // Stored (no compression)
-      return decoder.decode(compressedData);
-    } else if (compressionMethod === 8) {
-      // Deflate
-      return new Promise((resolve, reject) => {
-        const inflate = createInflateRaw();
-        const chunks: Buffer[] = [];
-        inflate.on("data", (chunk: Buffer) => chunks.push(chunk));
-        inflate.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-        inflate.on("error", reject);
-        inflate.write(Buffer.from(compressedData));
-        inflate.end();
-      });
-    }
-
-    throw new Error(`Unsupported ZIP compression method: ${compressionMethod}`);
-  }
-
-  private parseCsv(csvContent: string): any[] {
-    const lines = csvContent.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-
-    // Skip Bing report header lines (lines starting with "Report Name:", "Report Time:", etc.)
-    // and the footer line (starting with "@" or "©")
-    let headerIdx = -1;
-    let dataEndIdx = lines.length;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      // The column header row is the first line that looks like CSV with quoted column names
-      // and doesn't start with "Report " or "Time Zone" etc.
-      if (line.startsWith('"Report ') || line.startsWith('"Time Zone') ||
-          line.startsWith('"Last Completed') || line.startsWith('"Potential') ||
-          line.startsWith('"Rows:') || line.startsWith('"Report Filter')) {
-        continue;
-      }
-      if (line.startsWith('"@') || line.startsWith('"©')) {
-        dataEndIdx = i;
-        continue;
-      }
-      if (headerIdx === -1) {
-        headerIdx = i;
-      }
-    }
-
-    if (headerIdx === -1) {
-      return [];
-    }
-
-    const headers = this.parseCsvLine(lines[headerIdx]);
-    const rows: any[] = [];
-
-    for (let i = headerIdx + 1; i < dataEndIdx; i++) {
-      const line = lines[i];
-      if (line.startsWith('"@') || line.startsWith('"©') || line.length === 0) continue;
-
-      const values = this.parseCsvLine(line);
-      const row: any = {};
-      for (let j = 0; j < headers.length; j++) {
-        const key = headers[j];
-        let val: any = values[j] || "";
-        // Convert numeric-looking values
-        if (/^-?\d+(\.\d+)?$/.test(val)) {
-          val = parseFloat(val);
-        }
-        row[key] = val;
-      }
-      rows.push(row);
-    }
-
-    return rows;
-  }
-
-  // Handles escaped quote (double quote "") inside quoted fields, e.g. '"Campaign ""A, B"""'
-  private parseCsvLine(line: string): string[] {
-    const fields: string[] = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (inQuotes) {
-        if (ch === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') {
-            // Handle double quote escape: "" -> "
-            current += '"';
-            i++;
-          } else {
-            inQuotes = false;
-          }
-        } else {
-          current += ch;
-        }
-      } else {
-        if (ch === '"') {
-          inQuotes = true;
-        } else if (ch === ",") {
-          fields.push(current);
-          current = "";
-        } else {
-          current += ch;
-        }
-      }
-    }
-    fields.push(current);
-    return fields;
+    const csvContent = await extractCsvFromZip(uint8);
+    return parseCsv(csvContent);
   }
 
   async waitForReport(client: ClientConfig, requestId: string, maxWaitMs: number = 120000): Promise<any[]> {
@@ -647,7 +520,8 @@ class BingAdsManager {
 
   async addSharedNegatives(client: ClientConfig, sharedListId: string, keywords: Array<{ text: string; match_type?: string }>): Promise<any> {
     const req = buildAddSharedNegativesRequest(sharedListId, keywords);
-    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "addSharedNegatives", req.method);
+    // POST appends to the list: not idempotent, so never retried.
+    return await this.apiCall(`${CAMPAIGN_MGMT_BASE}${req.path}`, req.body, client, "addSharedNegatives", req.method, { idempotent: false });
   }
 
   async updateCampaignBudget(client: ClientConfig, campaignId: string, dailyBudget: number): Promise<any> {
@@ -719,7 +593,10 @@ class BingAdsManager {
 const config = loadConfig();
 const adsManager = new BingAdsManager(config);
 
-const server = new Server(
+// Exported so tests can connect an in-memory transport and drive the real
+// tools/list and tools/call handlers registered below. main() is the only
+// production caller of server.connect().
+export const server = new Server(
   {
     name: __cliPkg.name,
     version: __cliPkg.version,
@@ -1123,4 +1000,20 @@ process.on("unhandledRejection", (reason) => {
   console.error("[error] Unhandled promise rejection:", reason);
 });
 
-main().catch(console.error);
+// Only auto-start the server when this module is executed directly (as the
+// CLI entrypoint, including through the npx/bin symlink), not when a test
+// imports it. Comparing the resolved module path to process.argv[1] is the
+// ESM equivalent of the CommonJS `require.main === module` guard.
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  main().catch(console.error);
+}

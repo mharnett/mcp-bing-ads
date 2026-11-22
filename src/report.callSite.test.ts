@@ -9,6 +9,8 @@
 
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { deflateRawSync } from "zlib";
 
 import { createRecordingFetch, FAKE_ACCOUNT_ID, FAKE_ENV } from "../tests/helpers/fakeBingApi.js";
@@ -70,4 +72,27 @@ it("bing_ads_get_campaign_performance returns the rows parsed from the downloade
   expect(bodyOf(result)).toEqual([{ CampaignId: 300, CampaignName: "Brand, US", Spend: 45.67 }]);
   expect(api.apiRequests.map((r) => r.path)).toEqual(["/GenerateReport/Submit", "/GenerateReport/Poll", DOWNLOAD_URL]);
   expect(api.apiRequests[0].body.ReportRequest.Scope).toEqual({ AccountIds: [Number(FAKE_ACCOUNT_ID)] });
+});
+
+it("parses a downloaded ZIP whose sizes are in a data descriptor", async () => {
+  const zip = new Uint8Array(readFileSync(resolve(__dirname, "../tests/fixtures/report-data-descriptor.zip")));
+  api.setRoute((req) => {
+    if (req.path === "/GenerateReport/Submit") return { status: 200, body: { ReportRequestId: "r2" } };
+    if (req.path === "/GenerateReport/Poll") {
+      return { status: 200, body: { ReportRequestStatus: { Status: "Success", ReportDownloadUrl: DOWNLOAD_URL } } };
+    }
+    if (req.url === DOWNLOAD_URL) return { status: 200, body: zip };
+    return { status: 404, body: {} };
+  });
+
+  const result: any = await client.callTool({
+    name: "bing_ads_get_campaign_performance",
+    arguments: { account_id: FAKE_ACCOUNT_ID, start_date: "2026-11-20", end_date: "2026-11-20" },
+  });
+
+  expect(result.isError).toBeFalsy();
+  expect(bodyOf(result).map((r: any) => [r.CampaignId, r.Spend])).toEqual([
+    [300, 45.67],
+    [301, 3.1],
+  ]);
 });

@@ -155,16 +155,19 @@ const timeoutPolicy = timeout(30_000, TimeoutStrategy.Aggressive);
 // doesn't block all operations. Map<operationName, policy>
 const policyCache = new Map<string, any>();
 
-function getPolicyForOperation(operationName: string) {
-  if (!policyCache.has(operationName)) {
+function getPolicyForOperation(operationName: string, idempotent: boolean) {
+  const key = idempotent ? operationName : `${operationName}#no-retry`;
+  if (!policyCache.has(key)) {
     const breaker = circuitBreaker(isTransient, {
       halfOpenAfter: 60_000, // 60s to attempt recovery
       breaker: new ConsecutiveBreaker(5), // Open after 5 consecutive failures
     });
-    const policy = wrap(timeoutPolicy, breaker, retryPolicy);
-    policyCache.set(operationName, policy);
+    // Non-idempotent writes go out once: a 5xx or dropped connection after
+    // Microsoft stored the change would otherwise apply it again on retry.
+    const policy = idempotent ? wrap(timeoutPolicy, breaker, retryPolicy) : wrap(timeoutPolicy, breaker);
+    policyCache.set(key, policy);
   }
-  return policyCache.get(operationName);
+  return policyCache.get(key);
 }
 
 // ============================================
@@ -173,12 +176,13 @@ function getPolicyForOperation(operationName: string) {
 
 export async function withResilience<T>(
   fn: () => Promise<T>,
-  operationName: string
+  operationName: string,
+  options: { idempotent?: boolean } = {},
 ): Promise<T> {
   try {
     logger.debug({ operation: operationName }, "Starting API call");
 
-    const policy = getPolicyForOperation(operationName);
+    const policy = getPolicyForOperation(operationName, options.idempotent !== false);
     const result = await policy.execute(() => fn());
 
     logger.debug({ operation: operationName }, "API call succeeded");

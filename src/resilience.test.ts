@@ -93,3 +93,26 @@ describe("Resilience", () => {
     });
   });
 });
+
+describe("withResilience for non-idempotent writes", () => {
+  it("makes one attempt when idempotent is false", async () => {
+    let attempts = 0;
+    const fn = async () => {
+      attempts++;
+      throw new Error("503 Service Unavailable");
+    };
+    await expect(withResilience(fn, "addThings", { idempotent: false })).rejects.toThrow("Service Unavailable");
+    expect(attempts).toBe(1);
+  });
+
+  it("still retries the same operation name when idempotent is left out", async () => {
+    let attempts = 0;
+    const fn = async () => {
+      attempts++;
+      if (attempts < 2) throw new Error("503 Service Unavailable");
+      return { ok: true };
+    };
+    await expect(withResilience(fn, "addThings")).resolves.toEqual({ ok: true });
+    expect(attempts).toBe(2);
+  });
+});

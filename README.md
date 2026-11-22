@@ -289,7 +289,7 @@ Contributions welcome! Please:
 
 ## Built By
 
-**[Mark Harnett](https://www.linkedin.com/in/markharnett/)** — Demand generation leader and paid media practitioner building AI-powered ad management tools. This is the first comprehensive open-source Bing Ads MCP server — born from managing real campaigns across multiple accounts and wanting Claude to do the heavy lifting.
+**[Mark Harnett](https://www.linkedin.com/in/harnett/)** — Demand generation leader and paid media practitioner building AI-powered ad management tools. This is the first comprehensive open-source Bing Ads MCP server — born from managing real campaigns across multiple accounts and wanting Claude to do the heavy lifting.
 
 Built with production workloads in mind: resilient API calls (circuit breakers, retry with backoff, response truncation), full Quality Score diagnostics, and negative keyword management at scale.
 

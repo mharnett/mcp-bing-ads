@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.4](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.3...mcp-bing-ads-v1.3.4) (2026-11-22)
+
+
+### Bug Fixes
+
+* read report ZIPs whose sizes are in a data descriptor ([#30](https://github.com/mharnett/mcp-bing-ads/issues/30)) ([a739a8f](https://github.com/mharnett/mcp-bing-ads/commit/a739a8f25bac6bd451cf8152c4d836e080e40a13))
+* send pino logs to stderr under piped stdio ([#29](https://github.com/mharnett/mcp-bing-ads/issues/29)) ([eddd14b](https://github.com/mharnett/mcp-bing-ads/commit/eddd14bb58166f90f3852d9796855fed6ff42075))
+* send shared negatives once; test the gate, bid read-back and report parser at the dispatch ([#27](https://github.com/mharnett/mcp-bing-ads/issues/27)) ([f8a45f6](https://github.com/mharnett/mcp-bing-ads/commit/f8a45f6a8cdc45b99e7e1147b29257a8b0b515cb))
+
 ## [1.3.3](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.2...mcp-bing-ads-v1.3.3) (2026-11-14)
 
 

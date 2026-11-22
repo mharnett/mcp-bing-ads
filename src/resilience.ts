@@ -14,11 +14,14 @@ import pino from "pino";
 // LOGGER
 // ============================================
 
+// Pretty-print only for a person at a terminal; pino-pretty writes to fd 2.
+const prettyOnTty = process.env.NODE_ENV !== "test" && process.stderr.isTTY;
+
 export const logger = pino(
   {
     level: process.env.LOG_LEVEL || "info",
     redact: ["access_token", "refresh_token", "client_secret", "*.access_token", "*.refresh_token", "*.client_secret"],
-    ...(process.env.NODE_ENV !== "test" && process.stderr.isTTY && {
+    ...(prettyOnTty && {
       transport: {
         target: "pino-pretty",
         options: {
@@ -30,8 +33,11 @@ export const logger = pino(
       },
     }),
   },
-  // When no transport (test mode), write to stderr directly
-  process.env.NODE_ENV === "test" ? pino.destination(2) : undefined,
+  // Everything else, including piped stdio (how MCP clients start this
+  // server), writes JSON lines to fd 2. pino defaults to stdout, which carries
+  // the MCP JSON-RPC stream, so leaving this undefined corrupted it
+  // (mcp-test-harness#10). pino takes a transport or a destination, not both.
+  prettyOnTty ? undefined : pino.destination(2),
 );
 
 // ============================================

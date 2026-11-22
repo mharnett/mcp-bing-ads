@@ -10,17 +10,66 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag or ref to publish (e.g. the release tag)'
+        description: 'Release tag to publish, on main (e.g. the release tag)'
         required: true
         type: string
 
+# No default token scopes; each job asks for what it needs.
+permissions: {}
+
 jobs:
-  test:
+  # Resolve what to publish before anything builds. The dispatch input is free
+  # text, so without this check a dispatch could build and publish any branch
+  # or SHA. Only a tag whose commit is on main passes, and test and publish
+  # then check out that exact commit, so a tag moved mid-run can't swap code.
+  resolve:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.ref.outputs.tag }}
+      sha: ${{ steps.ref.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a release tag on main
+        id: ref
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          case "$EVENT" in
+            release)
+              [[ "$GITHUB_REF" == refs/tags/* ]] || fail "Release run is on $GITHUB_REF, not a tag."
+              tag="${GITHUB_REF#refs/tags/}" ;;
+            workflow_dispatch)
+              [ "$GITHUB_REF" = "refs/heads/main" ] || fail "Run publish.yml from main (this run is on $GITHUB_REF)."
+              tag="${INPUT_REF#refs/tags/}" ;;
+            *)
+              fail "publish.yml does not run on $EVENT." ;;
+          esac
+          git check-ref-format "refs/tags/$tag" || fail "'$tag' is not a valid tag name."
+          sha="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")" || fail "No tag '$tag'. Pass a release tag, not a branch or SHA."
+          git merge-base --is-ancestor "$sha" refs/remotes/origin/main || fail "Tag '$tag' ($sha) is not on main."
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Publishing $tag at $sha."
+
+  test:
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 20
@@ -30,15 +79,19 @@ jobs:
       - run: npm test
 
   publish:
-    needs: test
+    needs: [resolve, test]
     runs-on: ubuntu-latest
+    # Protection (allowed refs, reviewers, secrets) is set on this
+    # environment in repo settings, not here.
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:

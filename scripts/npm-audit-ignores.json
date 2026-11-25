@@ -1,0 +1,26 @@
+[
+  {
+    "id": "GHSA-w48q-cv73-mx4w",
+    "package": "@modelcontextprotocol/sdk",
+    "severity": "high",
+    "reason": "DNS rebinding against the SDK's HTTP server transports. Not reachable: this server only starts the SDK's stdio transport. Analysis in mharnett/mcp-reddit-ads#26.",
+    "added": "2026-11-24",
+    "expires": "2027-01-27"
+  },
+  {
+    "id": "GHSA-6prh-2h8m-c8cw",
+    "package": "@modelcontextprotocol/sdk",
+    "severity": "moderate",
+    "reason": "Redirects followed by the SDK's HTTP client transports and OAuth client. Not reachable: this server ships no MCP client. Analysis in mharnett/mcp-reddit-ads#26.",
+    "added": "2026-11-24",
+    "expires": "2027-01-27"
+  },
+  {
+    "id": "GHSA-mrhx-c7xc-m3w5",
+    "package": "zod",
+    "severity": "high",
+    "reason": "Memory exhaustion while validating oversized arrays. Not reachable by a remote sender: over stdio, the only sender is the local client that launched the process. Analysis in mharnett/mcp-reddit-ads#26.",
+    "added": "2026-11-24",
+    "expires": "2027-01-27"
+  }
+]

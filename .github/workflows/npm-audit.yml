@@ -1,0 +1,38 @@
+name: npm audit
+
+# Weekly dependency audit. scripts/npm-audit-gate.mjs fails this run on a high
+# or critical advisory that scripts/npm-audit-ignores.json does not name, on an
+# ignore past its date, and on an audit that failed or came back empty.
+#
+# No push or pull_request trigger. A newly published advisory is not the pull
+# request's doing, and a later green run under this name would hide a red one.
+# So the newest run here is always the newest audit.
+#
+# Not covered: GitHub turns schedules off in a public repo after 60 days
+# without activity, and nothing reports a run that never started.
+on:
+  schedule:
+    # Monday 15:37 UTC.
+    - cron: '37 15 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # No npm ci: the audit reads package-lock.json only, so nothing is
+      # installed and no package code runs.
+      - run: node scripts/npm-audit-gate.mjs

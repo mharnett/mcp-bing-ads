@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.5](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.4...mcp-bing-ads-v1.3.5) (2026-11-26)
+
+
+### Bug Fixes
+
+* keep the rotated refresh token out of security's arguments ([#42](https://github.com/mharnett/mcp-bing-ads/issues/42)) ([07a72e7](https://github.com/mharnett/mcp-bing-ads/commit/07a72e7e2d7512fbc7239417ed40027ed428d99f))
+* token helpers listen on loopback only and print no token ([#41](https://github.com/mharnett/mcp-bing-ads/issues/41)) ([9b162ed](https://github.com/mharnett/mcp-bing-ads/commit/9b162ed9342804f4fd2693e7866b1f0a21abd9b0))
+
 ## [1.3.4](https://github.com/mharnett/mcp-bing-ads/compare/mcp-bing-ads-v1.3.3...mcp-bing-ads-v1.3.4) (2026-11-22)
 
 

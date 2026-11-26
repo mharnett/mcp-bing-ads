@@ -1,105 +1,93 @@
+// Every call here injects the runner, so the real `security` binary is never run.
 import { describe, it, expect, vi } from "vitest";
 import {
-  buildKeychainUpsertArgs,
+  buildKeychainUpsertCommand,
   persistSecretToKeychain,
   KEYCHAIN_ACCOUNT,
+  MAX_COMMAND_BYTES,
 } from "./keychain";
 
+const ok = () => vi.fn(() => ({ status: 0 }));
+const commandFor = (secret: string) =>
+  `add-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "svc" -w "${secret}" -U\n`;
+/** A secret that makes the command line exactly `bytes` long. */
+const secretForLineOf = (bytes: number) => "a".repeat(bytes - Buffer.byteLength(commandFor("")));
+
 describe("keychain token persistence", () => {
-  describe("buildKeychainUpsertArgs", () => {
-    it("builds security command with atomic -U flag", () => {
-      const args = buildKeychainUpsertArgs("test-service", "test-secret");
+  it("uses this server's Keychain account", () => {
+    expect(KEYCHAIN_ACCOUNT).toBe("bing-ads-mcp");
+  });
 
-      // Verify atomic upsert flag is present (prevents lost tokens on delete failure)
-      expect(args).toContain("-U");
-      expect(args).toEqual([
-        "add-generic-password",
-        "-a",
-        KEYCHAIN_ACCOUNT,
-        "-s",
-        "test-service",
-        "-w",
-        "test-secret",
-        "-U",
-      ]);
+  it("writes through `security -i`, with the secret on stdin and never in the arguments", () => {
+    const run = ok();
+
+    expect(persistSecretToKeychain("svc", "FAKE!token*with$punct", run)).toBe(true);
+
+    expect(run).toHaveBeenCalledTimes(1);
+    const [file, args, opts] = run.mock.calls[0] as any[];
+    expect([file, args]).toEqual(["security", ["-i"]]);
+    expect(opts.input).toBe(commandFor("FAKE!token*with$punct"));
+    // security quotes its input in error messages, so its output is discarded.
+    expect(opts.stdio).toEqual(["pipe", "ignore", "ignore"]);
+  });
+
+  // Delete-then-add can lose a rotating token if the second call never happens.
+  it("upserts in one command (-U) and never deletes first", () => {
+    const command = buildKeychainUpsertCommand("svc", "new-token")!;
+    expect(command).toMatch(/^add-generic-password .* -U\n$/);
+    expect(command).not.toContain("delete-generic-password");
+  });
+
+  it("allows an account override", () => {
+    expect(buildKeychainUpsertCommand("svc", "s", "other")).toContain('-a "other"');
+  });
+
+  it.each([[{ status: 45 }], [{ status: null }]])("returns false when security exits %j", (result) => {
+    expect(persistSecretToKeychain("svc", "token", () => result)).toBe(false);
+  });
+
+  it("returns false, without throwing, when security cannot be started", () => {
+    const run = () => {
+      throw new Error("ENOENT");
+    };
+    expect(persistSecretToKeychain("svc", "token", run)).toBe(false);
+  });
+
+  // `security -i` splits a line longer than its 4096-byte buffer and runs the
+  // first piece on its own, which stores a truncated secret in the default
+  // Keychain. Such a line must never reach it.
+  describe("line length", () => {
+    it("stays under security's buffer", () => {
+      expect(MAX_COMMAND_BYTES).toBeLessThan(4096);
     });
 
-    it("allows custom account override", () => {
-      const args = buildKeychainUpsertArgs("service", "secret", "custom-account");
-      expect(args).toContain("-a");
-      expect(args).toContain("custom-account");
+    it("sends a line of exactly the limit", () => {
+      const run = ok();
+      expect(persistSecretToKeychain("svc", secretForLineOf(MAX_COMMAND_BYTES), run)).toBe(true);
+      expect(Buffer.byteLength((run.mock.calls[0] as any[])[2].input)).toBe(MAX_COMMAND_BYTES);
+    });
+
+    it("never runs security for a line one byte over", () => {
+      const run = ok();
+      expect(persistSecretToKeychain("svc", secretForLineOf(MAX_COMMAND_BYTES + 1), run)).toBe(false);
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it("counts bytes, not characters", () => {
+      const run = ok();
+      const secret = "é".repeat(2100); // 2100 characters, 4200 bytes
+      expect(persistSecretToKeychain("svc", secret, run)).toBe(false);
+      expect(run).not.toHaveBeenCalled();
     });
   });
 
-  describe("persistSecretToKeychain", () => {
-    it("returns true on successful upsert", () => {
-      const mockExec = vi.fn(); // Does not throw
-      const result = persistSecretToKeychain("test-service", "test-token", mockExec);
-
-      expect(result).toBe(true);
-      expect(mockExec).toHaveBeenCalledWith(
-        "security",
-        expect.arrayContaining(["-U"]),
-      );
-    });
-
-    it("returns false when keychain access denied (no throw)", () => {
-      const mockExec = vi.fn(() => {
-        throw new Error("Keychain locked");
-      });
-      const result = persistSecretToKeychain(
-        "test-service",
-        "test-token",
-        mockExec,
-      );
-
-      // Critical: must return false, not throw (caller falls back to session token)
-      expect(result).toBe(false);
-    });
-
-    it("uses atomic -U flag (anchor test: prevents delete-then-add race)", () => {
-      const mockExec = vi.fn();
-      persistSecretToKeychain("service", "new-token", mockExec);
-
-      const callArgs = mockExec.mock.calls[0];
-      const keychainArgs = callArgs[1] as string[];
-
-      // Anchor: -U must come AFTER -w, as a single command
-      const wIndex = keychainArgs.indexOf("-w");
-      const uIndex = keychainArgs.indexOf("-U");
-      expect(wIndex).toBeGreaterThanOrEqual(0);
-      expect(uIndex).toBeGreaterThanOrEqual(0);
-      expect(uIndex).toBeGreaterThan(wIndex); // -U appears after secret value
-
-      // Shape test: verify the command is a single atomic upsert, not delete+add pattern
-      expect(keychainArgs).toContain("add-generic-password");
-      expect(keychainArgs).not.toContain("delete-generic-password");
-    });
-
-    it("rotates token correctly (old is replaced atomically)", () => {
-      const mockExec = vi.fn();
-
-      // Simulate Microsoft's rotating refresh token behavior
-      persistSecretToKeychain("bing-refresh", "old-token-abc123", mockExec);
-      expect(mockExec).toHaveBeenCalledTimes(1);
-
-      persistSecretToKeychain("bing-refresh", "new-token-def456", mockExec);
-      expect(mockExec).toHaveBeenCalledTimes(2);
-
-      // Both calls should use the atomic -U upsert
-      for (const call of mockExec.mock.calls) {
-        const args = call[1] as string[];
-        expect(args).toContain("-U");
-      }
-    });
-
-    it("passes service name correctly to keychain", () => {
-      const mockExec = vi.fn();
-      persistSecretToKeychain("bing-refresh", "token123", mockExec);
-
-      const keychainArgs = mockExec.mock.calls[0][1] as string[];
-      const sIndex = keychainArgs.indexOf("-s");
-      expect(keychainArgs[sIndex + 1]).toBe("bing-refresh");
-    });
-  });
+  it.each([['a"b'], ["a\\b"], ["a\nb"], ["a\rb"], ["a\0b"]])(
+    "never runs security for a value that would break out of its quotes (%j)",
+    (secret) => {
+      const run = ok();
+      expect(persistSecretToKeychain("svc", secret, run)).toBe(false);
+      expect(persistSecretToKeychain(secret, "token", run)).toBe(false);
+      expect(run).not.toHaveBeenCalled();
+    },
+  );
 });

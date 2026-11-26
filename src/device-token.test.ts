@@ -29,39 +29,31 @@ describe("get-refresh-token-device", () => {
   });
 
   describe("handleRefreshToken", () => {
-    it("upserts the token under the chosen service", () => {
-      const exec = vi.fn();
-      const ok = handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN_VIEWER", { exec, log: vi.fn() });
+    it("stores the token under the chosen service", () => {
+      const store = vi.fn(() => ({ where: "keychain" }));
+      const ok = handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN_VIEWER", { store, log: vi.fn() });
 
       expect(ok).toBe(true);
-      expect(exec).toHaveBeenCalledWith("security", [
-        "add-generic-password",
-        "-a",
-        "bing-ads-mcp",
-        "-s",
-        "BING_ADS_REFRESH_TOKEN_VIEWER",
-        "-w",
-        TOKEN,
-        "-U",
-      ]);
+      expect(store).toHaveBeenCalledWith({
+        account: "bing-ads-mcp",
+        service: "BING_ADS_REFRESH_TOKEN_VIEWER",
+        secret: TOKEN,
+      });
     });
 
     it("never prints the token on success", () => {
       const log = vi.fn();
-      handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN", { exec: vi.fn(), log });
+      handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN", { store: () => ({ where: "keychain" }), log });
 
       const printed = log.mock.calls.flat().join("\n");
       expect(printed).not.toContain(TOKEN);
       expect(printed).toContain("BING_ADS_REFRESH_TOKEN");
     });
 
-    it("never prints the token when the Keychain write fails", () => {
+    it("reports failure, without the token, when it cannot be saved", () => {
       const log = vi.fn();
-      // execFileSync's error message echoes the full command line, token included.
-      const exec = vi.fn(() => {
-        throw new Error(`Command failed: security add-generic-password -w ${TOKEN} -U`);
-      });
-      const ok = handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN", { exec, log });
+      const store = () => ({ where: null, error: "EACCES" });
+      const ok = handleRefreshToken(TOKEN, "BING_ADS_REFRESH_TOKEN", { store, log });
 
       expect(ok).toBe(false);
       expect(log.mock.calls.flat().join("\n")).not.toContain(TOKEN);

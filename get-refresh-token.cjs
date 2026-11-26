@@ -10,12 +10,17 @@
  *   2. Set env vars: BING_ADS_CLIENT_ID, BING_ADS_CLIENT_SECRET
  *   3. Run: node get-refresh-token.cjs
  *   4. Follow the browser prompt, sign in with your Microsoft account
- *   5. Copy the refresh token to Keychain:
- *      security add-generic-password -a bing-ads-mcp -s BING_ADS_REFRESH_TOKEN -w "<token>"
+ *   5. The token is never printed. It is saved to the macOS Keychain, or, off
+ *      macOS or if that fails, to a file only your user can read. The script
+ *      says which, and how to load it.
  */
 
 const http = require("http");
-const { execSync, execFileSync } = require("child_process");
+const { execSync } = require("child_process");
+const { storeToken, describeStored, describeOAuthError, describeFailure, listenLoopback } = require("./token-store.cjs");
+
+const KEYCHAIN_ACCOUNT = "bing-ads-mcp";
+const TOKEN_NAME = "BING_ADS_REFRESH_TOKEN";
 
 const CLIENT_ID = process.env.BING_ADS_CLIENT_ID;
 const CLIENT_SECRET = process.env.BING_ADS_CLIENT_SECRET;
@@ -24,30 +29,24 @@ const SCOPE = "https://ads.microsoft.com/msads.manage offline_access openid emai
 const AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
-if (!CLIENT_ID) {
-  console.error("Set BING_ADS_CLIENT_ID env var first");
-  process.exit(1);
+const LOGIN_HINT = process.env.BING_ADS_LOGIN_HINT || "";
+const authUrlFor = (clientId) => `${AUTH_URL}?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&response_mode=query&prompt=select_account${LOGIN_HINT ? "&login_hint=" + encodeURIComponent(LOGIN_HINT) : ""}`;
+
+function signedInAs(idToken) {
+  try {
+    if (idToken) {
+      const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64").toString());
+      return payload.preferred_username || payload.email || payload.upn || payload.name || "(no email claim)";
+    }
+  } catch {}
+  return "(unknown)";
 }
 
-const LOGIN_HINT = process.env.BING_ADS_LOGIN_HINT || "";
-const authUrl = `${AUTH_URL}?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&response_mode=query&prompt=select_account${LOGIN_HINT ? "&login_hint=" + encodeURIComponent(LOGIN_HINT) : ""}`;
-
-const server = http.createServer(async (req, res) => {
-  if (!req.url.startsWith("/callback")) return;
-
-  const url = new URL(req.url, "http://localhost:3000");
-  const code = url.searchParams.get("code");
-
-  if (!code) {
-    res.writeHead(400);
-    res.end("No code received");
-    return;
-  }
-
-  // Exchange code for tokens (public client flow — no client_secret)
+async function exchangeCode(code, clientId, deps) {
+  // Public client flow unless a client secret is set
   const params = new URLSearchParams({
     grant_type: "authorization_code",
-    client_id: CLIENT_ID,
+    client_id: clientId,
     code,
     redirect_uri: REDIRECT_URI,
     scope: SCOPE,
@@ -56,57 +55,87 @@ const server = http.createServer(async (req, res) => {
     params.set("client_secret", CLIENT_SECRET);
   }
 
-  try {
-    const resp = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
-    });
+  const resp = await deps.fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = await resp.json();
 
-    const data = await resp.json();
-
-    if (data.refresh_token) {
-      let who = "(unknown)";
-      try {
-        if (data.id_token) {
-          const payload = JSON.parse(Buffer.from(data.id_token.split(".")[1], "base64").toString());
-          who = payload.preferred_username || payload.email || payload.upn || payload.name || "(no email claim)";
-        }
-      } catch {}
-      let stored = false;
-      try {
-        execFileSync("security", ["add-generic-password", "-a", "bing-ads-mcp", "-s",
-          "BING_ADS_REFRESH_TOKEN", "-w", data.refresh_token, "-U"]);
-        stored = true;
-      } catch (e) {
-        console.error("Keychain store failed:", e.message);
-      }
-      console.log("\n=== SUCCESS ===");
-      console.log(">>> Signed in as:", who, "<<<   (must be drak-api@outlook.com)");
-      console.log(">>> Token stored to keychain:", stored, "| prefix:", data.refresh_token.slice(0, 16));
-
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end("<h1>Success!</h1><p>Signed in as " + who + ". Token stored. You can close this tab.</p>");
-    } else {
-      console.error("No refresh token in response:", data);
-      res.writeHead(500);
-      res.end("Error: " + JSON.stringify(data));
-    }
-  } catch (err) {
-    console.error("Token exchange failed:", err);
-    res.writeHead(500);
-    res.end("Error: " + err.message);
+  if (!data.refresh_token) {
+    const why = describeOAuthError(data);
+    deps.log(`No refresh token in response (${why})`);
+    return { ok: false, text: `Error: ${why}` };
   }
 
-  setTimeout(() => process.exit(0), 1000);
-});
+  const who = signedInAs(data.id_token);
+  const result = deps.store({ account: KEYCHAIN_ACCOUNT, service: TOKEN_NAME, secret: data.refresh_token });
+  deps.log(`\n>>> Signed in as: ${who} <<<  (check this is the account you meant to use)`);
+  deps.log(describeStored(result, { account: KEYCHAIN_ACCOUNT, service: TOKEN_NAME, envVar: TOKEN_NAME }));
+  return result.where
+    ? { ok: true, text: `Signed in as ${who}. Token saved. You can close this tab.` }
+    : { ok: false, text: "The token could not be saved. See the terminal." };
+}
 
-server.listen(3000, () => {
+function startCallbackServer({ port, clientId, deps }) {
+  const handler = async (req, res) => {
+    if (!req.url.startsWith("/callback")) return;
+
+    const url = new URL(req.url, "http://localhost:3000");
+    const code = url.searchParams.get("code");
+
+    if (!code) {
+      res.writeHead(400);
+      res.end("No code received");
+      return;
+    }
+
+    let outcome;
+    try {
+      outcome = await exchangeCode(code, clientId, deps);
+    } catch (err) {
+      const why = describeFailure(err);
+      deps.log(`Token exchange failed: ${why}`);
+      outcome = { ok: false, text: `Error: ${why}` };
+    }
+    res.writeHead(outcome.ok ? 200 : 500, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(outcome.text, () => deps.done(outcome.ok ? 0 : 1));
+  };
+  return listenLoopback(() => http.createServer(handler), port);
+}
+
+async function main() {
+  if (!CLIENT_ID) {
+    console.error("Set BING_ADS_CLIENT_ID env var first");
+    process.exit(1);
+  }
+
+  await startCallbackServer({
+    port: 3000,
+    clientId: CLIENT_ID,
+    deps: {
+      fetch,
+      store: storeToken,
+      log: console.log,
+      done: (exitCode) => setTimeout(() => process.exit(exitCode), 1000),
+    },
+  });
+
+  const authUrl = authUrlFor(CLIENT_ID);
   if (process.env.BING_ADS_AUTO_OPEN === "1") {
     try { execSync(`open "${authUrl}"`); } catch {}
   }
   console.log("\n>>> Do NOT let any other tab hit localhost:3000. <<<");
-  console.log(">>> Copy this URL into an INCOGNITO window and sign in as drak-api@outlook.com:\n");
+  console.log(">>> Copy this URL into an INCOGNITO window and sign in:\n");
   console.log(authUrl);
   console.log("");
-});
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`Could not start: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { startCallbackServer };

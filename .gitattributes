@@ -1,0 +1,4 @@
+# Windows checks files out with CRLF line endings. Vite 7 only strips a "#!"
+# line that ends in a bare LF, so a test that imports such a script fails to
+# parse there. windows-checkout.guard.test.mjs pins this.
+*.mjs text eol=lf

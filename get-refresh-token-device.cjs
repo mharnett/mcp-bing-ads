@@ -7,9 +7,12 @@
  *   1. Set env var: BING_ADS_CLIENT_ID
  *   2. Run: node get-refresh-token-device.cjs [--keychain-service <name>]
  *   3. Go to the URL shown, enter the code, sign in with Google
- *   4. Token is stored in Keychain (never printed) under <name>,
- *      default BING_ADS_REFRESH_TOKEN (the MCP's own token)
+ *   4. Token is saved (never printed) to the Keychain under <name>, default
+ *      BING_ADS_REFRESH_TOKEN (the MCP's own token), or, off macOS or if that
+ *      fails, to a file only your user can read
  */
+
+const { storeToken, describeStored, describeFailure } = require("./token-store.cjs");
 
 const CLIENT_ID = process.env.BING_ADS_CLIENT_ID;
 const SCOPE = "https://ads.microsoft.com/msads.manage offline_access";
@@ -34,27 +37,12 @@ function parseArgs(argv) {
   return { keychainService };
 }
 
-// Stores the token and reports where. The token itself is never logged:
+// Saves the token and reports where. The token itself is never logged:
 // output from this script ends up in terminal scrollback and transcripts.
-function handleRefreshToken(refreshToken, keychainService, { exec, log }) {
-  try {
-    exec("security", [
-      "add-generic-password",
-      "-a",
-      KEYCHAIN_ACCOUNT,
-      "-s",
-      keychainService,
-      "-w",
-      refreshToken,
-      "-U",
-    ]);
-    log(`\nRefresh token saved to Keychain: service ${keychainService}, account ${KEYCHAIN_ACCOUNT}.`);
-    return true;
-  } catch (e) {
-    // e.message from execFileSync echoes the command line, token included.
-    log(`\nFailed to save to Keychain (security exit ${e.status ?? "unknown"}). The token was not printed; run this again.`);
-    return false;
-  }
+function handleRefreshToken(refreshToken, keychainService, { store, log }) {
+  const result = store({ account: KEYCHAIN_ACCOUNT, service: keychainService, secret: refreshToken });
+  log("\n" + describeStored(result, { account: KEYCHAIN_ACCOUNT, service: keychainService, envVar: DEFAULT_KEYCHAIN_SERVICE }));
+  return Boolean(result.where);
 }
 
 async function main() {
@@ -133,7 +121,7 @@ async function main() {
     if (tokenData.refresh_token) {
       console.log("\n\n=== SUCCESS ===");
       const saved = handleRefreshToken(tokenData.refresh_token, keychainService, {
-        exec: (cmd, args) => require("child_process").execFileSync(cmd, args, { stdio: "ignore" }),
+        store: storeToken,
         log: console.log,
       });
       process.exit(saved ? 0 : 1);
@@ -146,7 +134,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((err) => {
-    console.error(err);
+    console.error(describeFailure(err));
     process.exit(1);
   });
 }
